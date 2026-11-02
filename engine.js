@@ -1,18 +1,32 @@
-/* ===== ENGINE (pure logic: no DOM). Reused by the UI, by the Web Worker and by tools/selftest.mjs ===== */
+/* ===== ENGINE (pure logic: no DOM). Loaded by the page, and by tools/selftest.mjs, tools/bench.mjs ===== */
 (function (g) {
   'use strict';
 
   var DIRS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
   var MATE = 1000000, MATEC = MATE - 5000;
-  /* Strength ladder. The label is the only thing a player sees, so the name is short and the
-     depth/budget belong in the rules panel and the README, where they are measured, not advertised.
-     Normal is what the original CPU was aiming for; the old top rung ("Expert", 26 plies) is now
-     called Master, and Expert is a new rung between Hard and Master. */
+  /* Strength ladder: a proved depth plus a clock. The label is the only thing a player sees, so
+     the name is short and the numbers belong in the rules panel and the README, where they are
+     measured rather than advertised.
+
+     The depths below are chosen from what this search can actually prove, measured on five
+     positions of one real game (the opening, two mid-game, two late) with a fresh table each
+     time, one thread:  depth 12 in ~22 ms,  depth 16 in ~160 ms,  depth 20 in ~1.0 s.
+     With no ceiling in the way, 200/400/800/1600/3200 ms prove a median depth of 13/14/15/16/17
+     on that sample: one extra ply per doubling of the clock, which is how the rungs are placed.
+     (Two of those positions had a forced line to a goal proved at depth 9 and 13 and stopped
+     there whatever the clock allowed, which drags the medians down; the slope is what repeats
+     from sample to sample, not the absolute depth.) The old Hard(12) -> Expert(18) step claimed
+     six plies more than this and both halves of it were proved in well under a second, which is
+     why those two levels played the same game.
+     Master has no ceiling it can reach: asked at a cap of 22 or 24 it proved the ceiling at none
+     of the five positions inside 3.5 s (median 17 plies), so the clock is what stops it. Normal
+     is what the original CPU was aiming for; Master is the old top rung renamed, Expert a rung
+     between Hard and Master. */
   var LEVELS = {
     easy:   { depth: 1,  budget: 120,  label: 'Easy' },
     normal: { depth: 6,  budget: 500,  label: 'Normal' },
-    hard:   { depth: 12, budget: 1500, label: 'Hard' },
-    expert: { depth: 18, budget: 2400, label: 'Expert' },
+    hard:   { depth: 12, budget: 1000, label: 'Hard' },
+    expert: { depth: 16, budget: 1500, label: 'Expert' },
     master: { depth: 26, budget: 3500, label: 'Master' }
   };
 
@@ -321,12 +335,17 @@
       hashAll(ps);
 
       var ordered = moves, scores = new Map(), best = moves[0], bestScore = -Infinity, done = 0, d;
+      var doneWlo = -Infinity, doneWhi = Infinity;   /* the window of the deepest completed pass */
       /* Iterative deepening normally starts again at ply 1 for every kick and walks the whole
          tree again to get nowhere new. If this very position is in the table — it was, a move
          ago, a node inside the tree that was just searched — start from the depth that
          proof already reached, and spend the time on what is actually new. */
       var startAt = 1, slotP = (h1 >>> 0) & TT_MASK;
-      if (ttA[slotP] === h1 && ttB[slotP] === h2) { startAt = ttD[slotP] >> 2; if (startAt < 1) startAt = 1; }
+      var hitP = ttA[slotP] === h1 && ttB[slotP] === h2;
+      /* start one ply past the proof the table already holds: re-walking the depth that is already
+         proved proves nothing new. If that is past what this level asks for, nothing is searched
+         at all and the recorded move is the answer (see fromTable below). */
+      if (hitP) { startAt = (ttD[slotP] >> 2) + 1; if (startAt < 1) startAt = 1; }
 
       for (d = startAt; d <= cap; d++) {
         ordered = moves.slice();
@@ -374,16 +393,33 @@
         }
         if (aborted) break;
         scores = local;
-        if (localBest) { best = localBest; bestScore = alpha; done = d; }
+        if (localBest) { best = localBest; bestScore = alpha; done = d; doneWlo = wlo; doneWhi = whi; }
         if (Math.abs(bestScore) >= MATEC) break;
         if (Date.now() > ctx.deadline) break;
       }
 
+      /* Store what the root itself is worth. The search below only ever writes entries for the
+         positions *under* the root, so a position the CPU is actually asked to play was never
+         recorded by its own search — reaching it again (after an undo, or with a different level
+         asked for) started from scratch even though the answer had been proved minutes ago. */
+      if (done > 0) {
+        /* the root is ply 0, so no mate re-base is needed there */
+        if (!(ttA[slotP] === h1 && ttB[slotP] === h2 && (ttD[slotP] >> 2) > done)) {
+          if (ttD[slotP] === 0) ttFill++;
+          ttA[slotP] = h1; ttB[slotP] = h2; ttV[slotP] = bestScore; ttM[slotP] = best.edge;
+          ttD[slotP] = (done << 2) | (doneWlo > -Infinity && bestScore <= doneWlo ? 2 :
+                                      (doneWhi < Infinity && bestScore >= doneWhi ? 1 : 0));
+        }
+      }
       /* The position is already proven deeper than this level asks for: the move the table
-         recorded for it is the answer, and there is nothing new to score. */
-      if (done === 0 && ttM[slotP] >= 0) {
+         recorded for it is the answer, and there is nothing new to score. Say so, instead of
+         reporting a depth of 1 for a move that was answered without any new searching at all. */
+      var fromTable = false, tableDepth = 0;
+      if (done === 0 && hitP && ttM[slotP] >= 0) {
         for (var q3 = 0; q3 < moves.length; q3++) if (moves[q3].edge === ttM[slotP]) best = moves[q3];
         if ((ttD[slotP] & 3) === 0) bestScore = ttV[slotP];   /* an exact proof from earlier work */
+        tableDepth = ttD[slotP] >> 2;
+        fromTable = true;
       }
       /* Several moves can score exactly the same. Do not choose one of them at random:
          keep the order the search already put them in — goal first, then avoiding own
@@ -396,7 +432,16 @@
       return {
         edge: pick.edge, from: pick.from, to: pick.to, dir: pick.dir, isBounce: pick.isBounce,
         isGoal: pick.isGoal, isOwnGoal: pick.isOwnGoal,
-        score: bestScore, depth: done || Math.min(cap, startAt), nodes: nodes, ms: Date.now() - t0
+        /* depth: how deep this answer is actually proved. Either what the search just proved
+           (done), or — when nothing new was searched because the table already held the answer —
+           the proof the table holds, capped at what was asked; tableDepth says the real number,
+           which is what the page prints in that case. partial says the clock cut the walk off
+           before it proved even one ply, and the move is the best that partial walk saw. */
+        score: bestScore,
+        depth: done || Math.min(cap, fromTable ? Math.max(1, tableDepth) : startAt),
+        fromTable: fromTable, tableDepth: tableDepth,
+        partial: (!done && !fromTable && startAt <= cap),
+        nodes: nodes, ms: Date.now() - t0
       };
     }
 

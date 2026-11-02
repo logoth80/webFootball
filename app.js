@@ -479,11 +479,34 @@
      between them so the paper keeps drawing. It is not in a worker because a page opened
      straight from disk cannot load one: measured in current Chrome from a file:// page,
      new Worker('engine.js'), importScripts, fetch and XMLHttpRequest all fail — the origin is
-     'null'. The slices are not wasted work: the search keeps its table and starts where its
-     previous proof ended, so a slice that follows a slice buys depth instead of repeating it.
+     'null'. The slices are not wasted work: the search keeps its table and starts one ply past
+     any proof it already holds, so a slice that follows a slice buys depth instead of repeating
+     it, and a position that is already proved is answered from the table without any searching.
      The depth it has actually proved is written on the paper while it thinks. */
   var thinkTimer = null, thinkSeq = 0, thinkMs = 0, thinkNodes = 0, SLICE_MS = 60;
   function stopThinking() { thinkSeq++; if (thinkTimer) { clearTimeout(thinkTimer); thinkTimer = null; } }
+  /* One sentence about what the CPU really did. This used to print "proved depth 1 of 12" for a
+     move that was answered without any new searching at all, because the position had already been
+     searched during an earlier kick and the answer came out of the table. That is the most
+     impressive thing the engine does and it looked like the least; so the sentence now says which
+     of the three things actually happened. */
+  function aiInfo(mv) {
+    var lv = ENG.LEVELS[cfg.level] || ENG.LEVELS.normal;
+    var head = 'CPU ' + cfg.level + ': ';
+    var cost = ', ' + thinkNodes.toLocaleString() + ' positions, ' + (thinkMs / 1000).toFixed(1) + ' s';
+    if (mv.fromTable) {
+      return head + 'no new search: this position was already searched to ' + mv.tableDepth +
+        ' plies during an earlier kick, the move comes out of that proof' +
+        (mv.tableDepth > lv.depth ? ' (this level only asks for ' + lv.depth + ')' : '');
+    }
+    if (mv.partial) {
+      return head + 'the clock ended the search before it proved even one ply — this is the best move' +
+        ' that partial walk found, and the paper keeps the thinking going on the next kick' +
+        (thinkNodes ? cost : '');
+    }
+    return head + 'proved depth ' + mv.depth + ' of ' + lv.depth +
+      (thinkNodes ? cost : ', and the table answered every branch of it — not one new position was searched');
+  }
   function askCpu(side) {
     var lv = ENG.LEVELS[cfg.level] || ENG.LEVELS.normal;
     var total = Math.max(150, lv.budget), t0 = Date.now(), best = null, mine = ++thinkSeq;
@@ -502,8 +525,9 @@
         /* what this slice cost, added up: the depth shown is what the position is now proven
            to, part of which may have been proved during an earlier kick */
         thinkMs += mv.ms || 0; thinkNodes += mv.nodes || 0;
-        lastAiInfo = 'CPU ' + cfg.level + ': depth ' + mv.depth + ' of ' + lv.depth + ', ' +
-          thinkNodes.toLocaleString() + ' positions, ' + (thinkMs / 1000).toFixed(1) + ' s so far';
+        lastAiInfo = 'CPU ' + cfg.level + ': ' +
+          (mv.partial || mv.depth < 1 ? 'still on its first ply' : 'searched to ' + mv.depth + ' of ' + lv.depth + ' plies') +
+          ', ' + thinkNodes.toLocaleString() + ' positions, ' + (thinkMs / 1000).toFixed(1) + ' s so far';
         $('substatus').innerHTML = subLine();
       }
       /* proved as deep as this level asks: thinking more would prove the same thing again */
@@ -519,8 +543,7 @@
       logLine('no stroke left — ' + nameOf(match.winner) + ' wins', 'w');
       phase = 'over'; refreshUi(); return;
     }
-    if (mv.depth) lastAiInfo = 'CPU ' + cfg.level + ': proved depth ' + mv.depth + ' of ' + ((ENG.LEVELS[cfg.level] || ENG.LEVELS.normal).depth) +
-      ', ' + thinkNodes.toLocaleString() + ' positions, ' + (thinkMs / 1000).toFixed(1) + ' s';
+    lastAiInfo = aiInfo(mv);
     doKick(mv);
   }
 
