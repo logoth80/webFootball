@@ -18,8 +18,9 @@ python -m http.server 8000     # then open http://127.0.0.1:8000/index.html
 ```
 
 Three URL hashes change how the page opens, without touching your saved settings: `index.html#demo` starts a
-CPU vs CPU game you can watch, `index.html#level=hard` (or `easy`, `normal`, `expert`) picks the strength for
-that opening, and `index.html#dark` opens it on dark paper. Combine them: `index.html#demo#level=expert`.
+CPU vs CPU game you can watch, `index.html#level=hard` (or `easy`, `normal`, `expert`, `master`) picks the
+strength for that opening, and `index.html#dark` opens it on dark paper. Combine them:
+`index.html#demo#level=master`.
 
 The whole window is one sheet of graph paper — the page background grid is re-scaled to the pitch grid,
 and the pitch is drawn centred on the sheet, as it would be on a real exercise page. Player 1 plays in black,
@@ -49,15 +50,17 @@ The two clusters are the mirror of each other — left hand for Player 2, right 
 Player 1, so a laptop without a number pad still gets a full 8-direction pad. Binding is by physical key,
 so any keyboard layout works; the arrow keys are only an extra Player 1 binding.
 
-Other keys: `H` hint (or `T`) · `F3` switch Player 2 ↔ CPU · `R` new game · `U` undo · `M` sound ·
-`F1` rules and keys · `Esc` close. The rules panel is on `F1` rather than the usual `?` because `/` and `?`
-are Player 1 keys here. Every key action also exists as a button, an on-screen 3×3 key pad, or a click/tap on
-the hollow dot you want to kick to.
+Other keys: `H` hint (or `T`) · `F3` switch Player 2 ↔ CPU · `F5` new game · `U` undo · `M` sound ·
+`F1` rules and keys · `Esc` close. A bare `F5` restarts the match instead of reloading the page;
+`Ctrl`+`F5` and `Ctrl`+`R` still reload it, which is why the old single-key `R` binding is gone. The rules
+panel is on `F1` rather than the usual `?` because `/` and `?` are Player 1 keys here. Every key action also
+exists as a button, an on-screen 3×3 key pad, or a click/tap on the hollow dot you want to kick to.
 
 ## Settings
 
 * **Opponent** — solo as Player 1 or Player 2, two players on one keyboard, or CPU vs CPU to watch.
-* **CPU strength** — `easy`, `normal`, `hard`, `expert` (see [The CPU](#the-cpu)).
+* **CPU strength** — `easy`, `normal`, `hard`, `expert`, `master`, named plainly in the menu; the depths and
+  thinking times behind them are in [The CPU](#the-cpu). Normal is the default.
 * **Pitch** — small 6 × 10, classic 8 × 12 (the original board, with the area outside its border taken out
   of play), big 10 × 16.
 * **Show legal dots** — the faint rings next to the ball; turn them off for a real pen-and-paper feel.
@@ -88,36 +91,44 @@ The engine is a full game-tree search, not a distance heuristic:
 * The leaf evaluation is one BFS over still-blank strokes: how many kicks each side is from each goal,
   plus how many strokes are still available next to the ball. Mate distances are stored and re-based
   through the transposition table, so a forced win is preferred earlier and a loss later.
-* Levels: `easy` = random among moves that do not lose on the spot, and it takes a free goal;
+* Levels — the menu shows nothing but these names, so here is what they mean:
+  `easy` = random among moves that do not lose on the spot, and it takes a free goal;
   `normal` = 6 plies / 0.5 s (about what the original CPU was reaching for, but with you in the loop);
-  `hard` = 12 plies / 1.5 s; `expert` = 26 plies / 3.5 s. The status line reports depth, node count and
-  thinking time of every CPU move, so the difference between levels is visible on screen.
-* `normal`, `hard` and `expert` play the same answer from the same position. When several strokes score
+  `hard` = 12 plies / 1.5 s; `expert` = 18 plies / 2.4 s; `master` = 26 plies / 3.5 s. The top rung used to
+  be called `expert`; it is now `master`, and `expert` is a new rung below it — a remembered `expert` setting
+  is therefore one rung weaker, and `master` gives the old strength back. The status line reports depth, node
+  count and thinking time of every CPU move, so the difference between levels is visible on screen, and the
+  suite asserts that the rungs are ordered: each one deeper than the last, and given more time to get there.
+* `normal`, `hard`, `expert` and `master` play the same answer from the same position. When several strokes score
   exactly the same the CPU keeps the order the search sorted them in — goal, avoiding own goals, keeping
   the bounce tempo — instead of drawing one out of a hat; only `easy` varies its play. This also makes the
   test suite reproducible on a busy machine (an earlier version picked randomly among equal moves and a
   tactical test then failed depending on load).
 
-Measured on an idle machine, sudden-death matches on the classic pitch, colours alternated, `node tools/selftest.mjs`
-(the suite now also prints the search depth each side actually reached, since a level means a depth *and* the
-time to reach it):
+Measured on an idle machine, one run of `node tools/selftest.mjs`: sudden-death matches on the classic pitch,
+colours alternated, the weaker-named side given 0.25 s a move and the stronger 1.2 s (the suite prints the
+depth each side *actually reached*, since a level means a depth *and* the time to reach it):
 
 | pairing | result | strokes/game | depth reached |
 |---|---|---|---|
-| easy vs expert | expert 4 – 0 | ~12 | no search vs ~10 plies |
-| normal vs expert | **not stable: expert 4 – 0 in the run below, 1 – 3 and 2 – 2 in two earlier runs on the old hatched pitch** | ~75 | 5.7 vs ~14 plies |
+| easy vs master | master 4 – 0 | ~73 | no search vs ~13 plies |
 | easy vs normal | normal 4 – 0 | ~15 | no search vs ~5 plies |
+| normal vs master | master 4 – 0 (was 1 – 3 and 2 – 2 against ~15 plies on the original's hatched pitch) | ~76 | 5.7 vs ~14 plies |
+| hard vs expert | **2 – 2** | ~180 | 11.8 vs 15.4 plies |
+| expert vs master | master 3 – 1 | ~165 | **15.2 vs 15.2** — the extra second bought no depth, so this pairing said nothing about depth |
 
-**Read that second row as "search depth alone does not decide it", not as "deep search is useless".** On the
-original's pitch — whose goal-area hatch made the strips beside the goal lines playable — six plies held their
-own against fifteen. In both builds of this pitch, before and after the area outside the border was taken out
-of play, the deeper search took all four games. What did not change is *why*: with 12–26 plies, negamax
-happily commits to lines whose *leaf* score looks better under a distance-and-open-space evaluation but which
-are not better positions — a deep search optimising a shallow evaluation. The evaluator is the thing to improve
-first (`RULES.md` §10 is written as a prompt-ready spec for exactly that). A time-limited search also reaches
-slightly different depths each run, and an earlier build of this engine picked *randomly* among equal-scoring
-moves, which moved this pairing by a game either way. That is why the suite reports the pairing instead of
-asserting it, and why the depth both sides really reached is printed next to the score.
+**Read the bottom two rows as the finding, not as noise.** 12 plies against 18 split their games 2 – 2, and 18
+against 26 went one way while both sides stopped at the same depth. The gaps that *do* separate on this pitch
+are the structural ones: no search against any search, and 6 plies against 26 — the same 6-ply level held its
+own against ~26 on the original's hatched pitch, where the strips beside the goal lines were playable. So the
+menu is an honest ladder of *depth and thinking time*, which is exactly what the status line lets you verify;
+it is not a claim that each rung is a meaningfully better player. The reason is the same in every case: with
+12–26 plies, negamax happily commits to lines whose *leaf* score looks better under a distance-and-open-space
+evaluation but which are not better positions — a deep search optimising a shallow evaluation. The evaluator is
+the thing to improve first (`RULES.md` §10 is written as a prompt-ready spec for exactly that). A time-limited
+search also reaches slightly different depths each run, and an earlier build of this engine picked *randomly*
+among equal-scoring moves, which moved a pairing by a game either way. That is why the suite reports these
+pairings instead of asserting them, and why the depth both sides really reached is printed next to the score.
 
 Since the next goal wins, expect a long game before the one goal that ends it. The way to beat the strong
 levels is the way the game is really won: not by shooting, but by leaving the opponent with no stroke left to
@@ -169,9 +180,9 @@ No dependencies beyond Node (v24 used here). The rules and the AI live in one cl
 scripts lift out of the HTML and run head-less:
 
 ```
-node tools/selftest.mjs           # 57 checks: html wiring, pitch geometry and its boundary, rules, undo, self-play, ladder
-node tools/selftest.mjs --fast    # 52 of them — skips the ladder matches, seconds instead of minutes
-node tools/uismoke.mjs            # 12 checks: boots the interface on a stub DOM, drives the key pad and the hotkeys
+node tools/selftest.mjs           # 66 checks: html wiring, pitch geometry and its boundary, rules, undo, self-play, ladder
+node tools/selftest.mjs --fast    # 59 of them — skips the ladder matches, seconds instead of minutes
+node tools/uismoke.mjs            # 14 checks: boots the interface on a stub DOM, drives the key pad and the hotkeys
 node tools/trace.mjs hard 800     # prints what the CPU is thinking in a hand-made position
 ```
 
@@ -183,7 +194,9 @@ play, on all three pitch sizes. It also asserts a three-dot goal mouth with its 
 bare dot passes the turn while a lined dot is a bounce, that a dead-end bounce
 loses, that an own goal is offered, scores for the other side and loses the match for whoever kicked it in,
 that the first goal ends the match with no kick-off, bit-for-bit undo, that every move the CPU produces is
-legal, that it never passes, and that games end by the rules. The strength ladder is a
+legal, that it never passes, and that games end by the rules. The strength menu is asserted too: exactly
+`easy / normal / hard / expert / master`, each rung deeper than the one below it and given more time to get
+there, labelled by its name alone. What is *not* asserted is who wins: the strength ladder is a
 measurement, not a proof: each pairing prints the depth both sides reached, and if the machine was too busy
 for the stronger side to search deeper than the weaker one, the pairing is reported as inconclusive instead of
 failed. Run it on an idle machine if you want the number.

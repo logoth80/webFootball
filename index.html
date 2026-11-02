@@ -17,6 +17,7 @@
     --ink:#1e0082; --ink-soft:rgba(30,0,130,.55); --p1:#000000; --p2:#0000c8; --warn:#c01414;
     --panel:#fbfcff; --card:#ffffff; --line:rgba(30,0,130,.25); --shadow:0 2px 0 rgba(30,0,130,.12);
     --header-bg:rgba(255,255,255,.55); --modal-bg:rgba(243,245,251,.94); --active:rgba(30,0,130,.5);
+    --btn-hover:#ffffff; --pill:rgba(30,0,130,.07);
     --hand:Georgia,'Times New Roman',serif; --body:Arial,Helvetica,sans-serif; --mono:'Courier New',monospace;
     color-scheme:light;
   }
@@ -27,6 +28,7 @@
     --ink:#e9edf6; --ink-soft:rgba(214,224,242,.55); --p1:#4ed28c; --p2:#7fb0ff; --warn:#ff8080;
     --panel:#1f232c; --card:#262b36; --line:rgba(214,224,242,.22); --shadow:0 2px 0 rgba(0,0,0,.45);
     --header-bg:rgba(21,23,29,.60); --modal-bg:rgba(21,23,29,.95); --active:rgba(214,224,242,.45);
+    --btn-hover:#2a3140; --pill:rgba(214,224,242,.09);
     color-scheme:dark;
   }
   *{box-sizing:border-box}
@@ -42,28 +44,32 @@
     display:flex;flex-direction:column;
   }
   header{
-    display:flex;align-items:center;gap:14px;padding:8px 14px;border-bottom:2px solid var(--ink);
+    display:flex;align-items:center;gap:16px;padding:10px 14px;border-bottom:2px solid var(--ink);
     background:var(--header-bg);flex-wrap:wrap
   }
-  h1{font-family:var(--hand);font-style:italic;font-size:22px;margin:0;letter-spacing:.3px;white-space:nowrap}
-  h1 small{font-family:var(--body);font-style:normal;font-size:11px;color:var(--ink-soft);letter-spacing:0}
+  h1{font-family:var(--hand);font-style:italic;font-size:23px;margin:0;letter-spacing:.3px;white-space:nowrap}
   .score{display:flex;gap:10px;align-items:center;margin-left:6px}
-  .sbox{border:2px solid var(--ink);border-radius:3px;background:var(--panel);padding:3px 9px;min-width:96px;box-shadow:var(--shadow)}
+  .sbox{border:2px solid var(--ink);border-radius:4px;background:var(--panel);padding:3px 9px;min-width:96px;box-shadow:var(--shadow)}
   .sbox b{font-family:var(--hand);font-size:13px;display:block;line-height:1.1}
   .sbox i{font-style:normal;font-size:26px;font-family:var(--hand);display:block;text-align:center}
   .sbox.p1 b{color:var(--p1)} .sbox.p2 b{color:var(--p2)}
   .sbox.active{outline:2px dashed var(--active);outline-offset:2px}
-  .badge{font-family:var(--hand);font-size:13px;border:1px dashed var(--line);padding:3px 8px;border-radius:3px;color:var(--ink-soft)}
-  @media (max-width:1080px){.badge{display:none}h1 small{display:none}}
-  .tools{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  .tools{margin-left:auto;display:flex;gap:9px;flex-wrap:wrap}
+  /* the toolbar: big enough to hit reliably, quiet enough to stay out of the game's way */
   button{
-    font-family:var(--body);font-size:12px;color:var(--ink);background:var(--panel);
-    border:1.5px solid var(--ink);border-radius:3px;padding:5px 9px;cursor:pointer;box-shadow:var(--shadow)
+    display:inline-flex;align-items:center;gap:9px;min-height:42px;padding:10px 15px;
+    font-family:var(--body);font-size:14px;font-weight:600;letter-spacing:.2px;
+    color:var(--ink);background:var(--panel);border:1.5px solid var(--ink);border-radius:11px;
+    cursor:pointer;box-shadow:var(--shadow);transition:background .12s,box-shadow .12s,transform .08s
   }
-  button:hover{background:#fff}
-  button:active{transform:translateY(1px);box-shadow:none}
-  button:disabled{opacity:.4;cursor:default;box-shadow:none}
-  button kbd{font-family:var(--mono);font-size:10px;opacity:.7}
+  button:hover:not(:disabled){background:var(--btn-hover);box-shadow:0 3px 8px rgba(0,0,0,.16)}
+  button:active:not(:disabled){transform:translateY(1px);box-shadow:none}
+  button:disabled{opacity:.35;cursor:default;box-shadow:none}
+  button kbd{
+    font-family:var(--mono);font-size:11px;font-weight:400;line-height:1.6;color:var(--ink-soft);
+    background:var(--pill);border:1px solid var(--line);border-radius:6px;padding:1px 6px
+  }
+  @media (max-width:1080px){header{gap:10px}.tools{gap:6px}}
   main{flex:1;display:flex;gap:14px;padding:12px 14px 16px;min-height:0}
   .boardwrap{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0}
   canvas{background:var(--paper-field);touch-action:manipulation}
@@ -86,7 +92,10 @@
   .padwrap.idle .k{opacity:.4}
   form.set{display:grid;grid-template-columns:1fr;gap:7px}
   form.set label{font-size:11px;display:flex;flex-direction:column;gap:3px;color:var(--ink-soft)}
-  select,input[type=checkbox]{font-family:var(--body);font-size:12px;color:var(--ink);border:1.2px solid var(--line);border-radius:3px;background:var(--card);padding:4px}
+     select{font-family:var(--body);font-size:14px;color:var(--ink);border:1.5px solid var(--line);
+     border-radius:9px;background:var(--card);padding:8px 10px;min-height:38px;width:100%}
+   select:hover{border-color:var(--ink)}
+   input[type=checkbox]{width:16px;height:16px}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
   .chk{flex-direction:row!important;align-items:center;gap:6px!important}
   #log{font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink);max-height:132px;overflow:auto;white-space:pre-wrap}
@@ -116,18 +125,17 @@
 </head>
 <body>
 <header>
-  <h1>Paper Football <small>pen &amp; paper football — HTML rewrite of <code>football.pyw</code></small></h1>
+  <h1>Paper Football</h1>
   <div class="score">
     <div class="sbox p1" id="box1"><b>Player 1</b><i id="sc1">0</i></div>
     <div class="sbox p2" id="box2"><b>Player 2</b><i id="sc2">0</i></div>
   </div>
-  <div class="badge" id="target"></div>
   <div class="tools">
-    <button id="bNew">New game <kbd>R</kbd></button>
+    <button id="bNew">New game <kbd>F5</kbd></button>
     <button id="bUndo">Undo <kbd>U</kbd></button>
     <button id="bHint">Hint <kbd>H</kbd></button>
-    <button id="bMode">vs CPU <kbd>F3</kbd></button>
-    <button id="bSound">Sound on <kbd>M</kbd></button>
+    <button id="bMode"><span id="modeLbl">vs CPU</span><kbd>F3</kbd></button>
+    <button id="bSound"><span id="soundLbl">Sound on</span><kbd>M</kbd></button>
     <button id="bHelp">Rules &amp; keys <kbd>F1</kbd></button>
   </div>
 </header>
@@ -231,8 +239,10 @@
     four straight directions.<br>
     <b>Player 2</b> — the left-hand cluster: <code>Q W E</code> / <code>A D</code> / <code>Z X C</code>.</p>
     <p>Other keys: <code>H</code> hint (or <code>T</code>), <code>F3</code> switch Player 2 &harr; CPU,
-    <code>R</code> new game, <code>U</code> undo, <code>M</code> sound, <code>F1</code> this panel,
-    <code>Esc</code> closes it. <code>/</code> and <code>?</code> belong to Player 1, so the panel is not on
+    <code>F5</code> new game, <code>U</code> undo, <code>M</code> sound, <code>F1</code> this panel,
+    <code>Esc</code> closes it. A bare <code>F5</code> restarts the match instead of reloading the page;
+    <code>Ctrl</code>+<code>F5</code> and <code>Ctrl</code>+<code>R</code> still reload it.
+    <code>/</code> and <code>?</code> belong to Player 1, so the panel is not on
     <code>?</code>. On a phone or tablet use the on-screen key pad, or simply tap the highlighted dot you
     want to kick to.</p>
     <p><b>Paper and ink:</b> Settings &rarr; Paper. On light graph paper Player 1 plays with a <b>black</b> pen
@@ -243,18 +253,21 @@
 
     <h3>CPU strength</h3>
     <p><b>Easy</b> kicks around without shooting into its own goal; it is the only level that changes its
-    play from game to game. <b>Normal / Hard / Expert</b> run a real negamax search over the whole game
+    play from game to game. <b>Normal / Hard / Expert / Master</b> run a real negamax search over the whole game
     tree — your bounces and theirs are in the tree, which the original Python CPU did not model — with
     alpha-beta pruning, a transposition table and iterative deepening, and they answer a given position the
-    same way every time. <b>Normal</b> (6 kicks deep) is about the strength the original CPU was aiming for.
-    <b>Hard</b> (12) and <b>Expert</b> (26) search far deeper and take far longer per move; measured
-    head-to-head, that depth does not decide the result on its own — on this pitch the deeper search took 4
-    of 4 against <b>Normal</b>, on the older pitch with the goal-area hatch the 6-ply level held its own —
-    because what decides those games is the position evaluation, a distance-and-open-space proxy. If you want
-    a genuinely tougher CPU, the evaluator is what needs improving, not the search. The status line reports
-    the depth, node count and thinking time of every CPU move, so what each level is doing is visible.
-    Against the deeper levels expect to win by leaving the opponent without a stroke rather than by goals —
-    that is how this game is really decided.</p>
+    same way every time. <b>Normal</b> searches 6 kicks deep and is about the strength the original CPU was
+    aiming for; <b>Hard</b> searches 12, <b>Expert</b> 18, <b>Master</b> 26. The top rung used to be called
+    Expert: it is now Master, and Expert is a new rung between it and Hard — if you had the old Expert saved,
+    choose Master to get that strength back. Each step takes roughly twice as long per move (0.5 / 1.5 / 2.4 /
+    3.5&nbsp;s), and the status line reports the depth, node count and thinking time of every CPU move, so what
+    a level is doing is visible. Measured head-to-head, depth alone does not separate neighbouring rungs: the
+    26-ply level took 4 of 4 from the 6-ply one, but <b>Hard</b> against <b>Expert</b> — 12 against 18 — split
+    its games 2 of 4 each, and <b>Expert</b> against <b>Master</b> went to the deeper search only after both
+    sides stopped at the same depth. On the original's pitch six plies held their own against twenty-six. What
+    decides those games is the position evaluation, a distance-and-open-space proxy. If you want a genuinely
+    tougher CPU, the evaluator is what needs improving, not the search. Against the deeper levels expect to win
+    by leaving the opponent without a stroke rather than by goals — that is how this game is really decided.</p>
 
     <h3>What changed compared to <code>football.pyw</code></h3>
     <ul>
@@ -278,11 +291,16 @@
 
   var DIRS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
   var MATE = 1000000, MATEC = MATE - 5000;
+  /* Strength ladder. The label is the only thing a player sees, so the name is short and the
+     depth/budget belong in the rules panel and the README, where they are measured, not advertised.
+     Normal is what the original CPU was aiming for; the old top rung ("Expert", 26 plies) is now
+     called Master, and Expert is a new rung between Hard and Master. */
   var LEVELS = {
-    easy:   { depth: 1,  budget: 120,  label: 'Easy — casual kicks, never an own goal' },
-    normal: { depth: 6,  budget: 500,  label: 'Normal — like the original CPU, done properly' },
-    hard:   { depth: 12, budget: 1500, label: 'Hard — sees 12 kicks ahead' },
-    expert: { depth: 26, budget: 3500, label: 'Expert — reads 26 kicks deep (slow)' }
+    easy:   { depth: 1,  budget: 120,  label: 'Easy' },
+    normal: { depth: 6,  budget: 500,  label: 'Normal' },
+    hard:   { depth: 12, budget: 1500, label: 'Hard' },
+    expert: { depth: 18, budget: 2400, label: 'Expert' },
+    master: { depth: 26, budget: 3500, label: 'Master' }
   };
 
   /* ---------------- board ---------------- */
@@ -715,13 +733,15 @@
       if (raw) { var p = JSON.parse(raw); for (var k in p) if (cfg.hasOwnProperty(k)) cfg[k] = p[k]; }
     } catch (e) {}
   })();
-  /* index.html#demo starts a CPU vs CPU game you can watch; #level=hard|expert|easy|normal
+  /* a strength remembered by an older build may name a level that no longer exists */
+  if (!(window.FBEngine && FBEngine.LEVELS[cfg.level])) cfg.level = 'normal';
+  /* index.html#demo starts a CPU vs CPU game you can watch; #level=master|expert|hard|normal|easy
      picks the strength for this opening; #dark (or #theme=dark / #theme=light) picks the paper.
      None of them is written back to the saved settings. */
   try {
     var startHash = String((window.location && window.location.hash) || '').toLowerCase();
     if (startHash.indexOf('demo') >= 0) cfg.mode = 'demo';
-    var lv = /level=(easy|normal|hard|expert)/.exec(startHash);
+    var lv = /level=(easy|normal|hard|expert|master)/.exec(startHash);
     if (lv) cfg.level = lv[1];
     if (startHash.indexOf('dark') >= 0) cfg.theme = 'dark';
     var th = /theme=(light|dark|auto)/.exec(startHash);
@@ -1089,7 +1109,7 @@
       ctx.font = 'bold ' + Math.round(cell * 1.05) + 'px Cambria, Georgia, serif';
       ctx.fillText(nameOf(match.winner) + ' won!', cwpx / 2, chpx / 2 - cell * 0.2);
       ctx.fillStyle = T.ink; ctx.font = 'italic ' + Math.round(cell * 0.42) + 'px Georgia, serif';
-      ctx.fillText(explainEnd() + '   —   press R for a new game', cwpx / 2, chpx / 2 + cell * 0.6);
+      ctx.fillText(explainEnd() + '   —   press F5 for a new game', cwpx / 2, chpx / 2 + cell * 0.6);
     }
     /* The board area can settle to its real size well after boot — fonts loading, the
        window finishing its own layout, a sidebar wrapping — so keep checking cheaply
@@ -1112,7 +1132,6 @@
     anim = null; flash = null; hint = null; toast = null; hoverNode = -1;
     padSide = -1;
     $('log').textContent = '';
-    $('target').textContent = 'next goal wins · own goals count for the other side';
     layout();
     logLine('— new game: ' + nameOf(0) + ' vs ' + nameOf(1) + ' —', '');
     pump();
@@ -1184,7 +1203,7 @@
     } catch (e) { worker = null; workerCfgKey = 'failed'; }
   }
   function askCpu(side) {
-    var budget = ENG.LEVELS[cfg.level].budget;
+    var budget = (ENG.LEVELS[cfg.level] || ENG.LEVELS.normal).budget;
     ensureWorker();
     if (worker) {
       worker.postMessage({ cfg: { cellCols: cfg.cellCols, cellRows: cfg.cellRows, goalHalf: cfg.goalHalf }, used: match.ps.used, ball: match.ps.ball, side: side, level: cfg.level, budget: budget });
@@ -1270,8 +1289,9 @@
     sub.innerHTML = 'strokes drawn: ' + drawn + ' / ' + match.board.playable +
       ' · pitch ' + match.board.cellCols + '×' + match.board.cellRows + ' cells (' + match.board.W + '×' + match.board.H + ' dots)' +
       (lastAiInfo ? '<br>' + escapeHtml(lastAiInfo) : '');
-    $('bMode').textContent = (cfg.mode === '2p' ? 'vs CPU' : '2 players') + '  F3';
-    $('bSound').textContent = 'Sound ' + (cfg.sound ? 'on' : 'off');
+    /* only the label spans are rewritten, so the key pills keep their styling */
+    $('modeLbl').textContent = (cfg.mode === '2p' ? 'vs CPU' : '2 players');
+    $('soundLbl').textContent = 'Sound ' + (cfg.sound ? 'on' : 'off');
     $('bUndo').disabled = !match.hist.length || phase === 'anim' || phase === 'think';
     $('bHint').disabled = !(phase === 'wait' && isHuman(match.ps.side));
   }
@@ -1317,7 +1337,9 @@
        works. Help is F1, because ?, / and the letters around it all belong to the players. */
     if (code === 'F1') { e.preventDefault(); $('help').hidden = !$('help').hidden; return; }
     if (code === 'F3') { e.preventDefault(); toggleCpu(); return; }
-    if (code === 'KeyR') { e.preventDefault(); newMatch(); return; }
+    /* A bare F5 starts a new match instead of reloading the page. Ctrl+F5 and Ctrl+R are left to the
+       browser, so "start over" is one key and "throw this page away" is still a chord. */
+    if (code === 'F5') { if (e.ctrlKey || e.metaKey || e.altKey) return; e.preventDefault(); newMatch(); return; }
     if (code === 'KeyU') { e.preventDefault(); doUndo(); return; }
     if (code === 'KeyH' || code === 'KeyT') { e.preventDefault(); doHint(); return; }
     if (code === 'KeyM') { e.preventDefault(); cfg.sound = !cfg.sound; savePrefs(); refreshUi(); return; }
