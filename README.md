@@ -58,18 +58,20 @@ the hollow dot you want to kick to.
 
 * **Opponent** — solo as Player 1 or Player 2, two players on one keyboard, or CPU vs CPU to watch.
 * **CPU strength** — `easy`, `normal`, `hard`, `expert` (see [The CPU](#the-cpu)).
-* **Pitch** — small 6 × 10, classic 8 × 12 (the original board, less its goal-area hatch), big 10 × 16.
+* **Pitch** — small 6 × 10, classic 8 × 12 (the original board, with the area outside its border taken out
+  of play), big 10 × 16.
 * **Show legal dots** — the faint rings next to the ball; turn them off for a real pen-and-paper feel.
 * **Paper** — light graph paper (the default, and the look of the original: Player 1 in a black pen, Player 2
   in a blue one), dark paper (Player 1 in a green pencil, Player 2 in pale blue, because black would be
   invisible there), or follow the system's light/dark setting. The canvas, the panels and the page grid all
   switch together, and the switch is instant: the sheet is re-drawn, not re-loaded.
 
-Settings and the pitch you chose are remembered in `localStorage`. Two things are deliberately **not**
-settings: the next goal wins, and an own goal always scores for the other side — both are how the game is
-actually played, so they are rules here, not options (see [Deliberate changes](#deliberate-changes)). The
-printed pitch is asserted by the tests below: on the classic board 44 of the 404 lattice segments are
-printed, which leaves 360 playable.
+Settings and the pitch you chose are remembered in `localStorage`. Three things are deliberately **not**
+settings: the next goal wins, an own goal always scores for the other side, and the printed border really is
+the pitch — the first two are how the game is actually played, and the third is what makes the field mean
+something, so they are rules here, not options (see [Deliberate changes](#deliberate-changes)). The tests
+assert the exact breakdown: on the classic board 44 of the 404 lattice segments are drawn, 48 more lie outside
+that border and are blocked without being drawn, which leaves 312 playable.
 
 ## The CPU
 
@@ -102,33 +104,36 @@ time to reach it):
 
 | pairing | result | strokes/game | depth reached |
 |---|---|---|---|
-| easy vs expert | expert 4 – 0 | 17–30 | no search vs ~11 plies |
-| normal vs expert | **even — 1 – 3 and 2 – 2 in two runs, i.e. the 6-ply level held its own** | ~105 | 5.7 vs ~15 plies |
-| easy vs normal | normal 4 – 0 | 13–17 | no search vs ~5 plies |
+| easy vs expert | expert 4 – 0 | ~12 | no search vs ~10 plies |
+| normal vs expert | **not stable: expert 4 – 0 in the run below, 1 – 3 and 2 – 2 in two earlier runs on the old hatched pitch** | ~75 | 5.7 vs ~14 plies |
+| easy vs normal | normal 4 – 0 | ~15 | no search vs ~5 plies |
 
-**Read that second row carefully: searching six plies matched searching fifteen.** The search is not the
-bottleneck. Given 12–26 plies, negamax happily commits to lines whose *leaf* score looks better under a
-distance-and-open-space evaluation but which are not better positions — a deep search optimising a shallow
-evaluation. The evaluator is the thing to improve first (`RULES.md` §10 is written as a prompt-ready spec for
-exactly that). Note also that an earlier build of the engine picked *randomly* among equal-scoring moves; in
-that version `expert` won this pairing 4 – 0, which was partly `normal` randomly picking an equal-but-worse
-move. Removing that noise is what exposed the depth ranking for what it is — a less flattering and much more
-useful number to design against. Because a time-limited search reaches slightly different depths each run,
-this pairing moves by a game either way; that is why the suite reports it instead of asserting it.
+**Read that second row as "search depth alone does not decide it", not as "deep search is useless".** On the
+original's pitch — whose goal-area hatch made the strips beside the goal lines playable — six plies held their
+own against fifteen. In both builds of this pitch, before and after the area outside the border was taken out
+of play, the deeper search took all four games. What did not change is *why*: with 12–26 plies, negamax
+happily commits to lines whose *leaf* score looks better under a distance-and-open-space evaluation but which
+are not better positions — a deep search optimising a shallow evaluation. The evaluator is the thing to improve
+first (`RULES.md` §10 is written as a prompt-ready spec for exactly that). A time-limited search also reaches
+slightly different depths each run, and an earlier build of this engine picked *randomly* among equal-scoring
+moves, which moved this pairing by a game either way. That is why the suite reports the pairing instead of
+asserting it, and why the depth both sides really reached is printed next to the score.
 
-Against the strong levels, remember how this game is really won: not by shooting, but by leaving the
-opponent with no stroke left to draw. The CPU plays that endgame deliberately — expect long matches and
-few goals between two strong AIs, and expect to lose the paper if you only attack.
+Since the next goal wins, expect a long game before the one goal that ends it. The way to beat the strong
+levels is the way the game is really won: not by shooting, but by leaving the opponent with no stroke left to
+draw. The CPU plays that endgame deliberately — expect to lose the paper if you only attack.
 
 ## Deliberate changes
 
 Compared with `football.pyw`, these are choices, not accidents (the numbering follows §8 of [RULES.md](RULES.md)):
 
-1. **The goal-area hatch of the original is neither drawn nor playable.** The original printed 36 faint
-   diagonal and end-row segments beside the posts and then painted most of them back to white, so nobody
-   could see why a kick was blocked or where a bounce came from. Here the printed pitch is the touchlines,
-   the half-way line, the goal-area lines and the two short post lines: the thick border is enough to play
-   by, and it leaves 360 free lines instead of 324.
+1. **The printed border is the boundary of the pitch.** The original printed 36 faint diagonal and end-row
+   segments beside its posts: decoration, and at the same time the only thing that kept the ball inside the
+   field — it left a dozen strokes along the outer edge of its own goal line playable. Here the drawn pitch is
+   the touchlines, the half-way line, the goal-area lines and the two short post lines, and the area those
+   lines enclose plus the goal mouths is the playing area: strokes that would leave it are blocked without
+   being drawn, and the 12 dots outside it are not drawn either. On the classic board 44 segments are drawn,
+   48 more are off the pitch, and 312 are playable (the original allowed 324).
 2. **No silent pass.** A CPU with a legal stroke always plays one; being stuck loses for the stuck side,
    for the CPU exactly as for a human. The original returned "no move" and simply gave the turn back.
 3. **Own goals always score for the other side.** No switch and no "illegal kick" variant — the original
@@ -137,7 +142,7 @@ Compared with `football.pyw`, these are choices, not accidents (the numbering fo
    in a goal mouth, and that goal line stays exactly where it was drawn. A pitch with no legal stroke left
    ends the same way — the side that cannot kick loses. There is no draw rule.
 5. **The pitch size is a setting** instead of depending on your screen size, so "the classic 8 × 12" is a
-   reproducible board (404 segments, 44 printed, 360 playable — asserted by the tests).
+   reproducible board (404 segments, 44 drawn, 48 off the pitch, 312 playable — asserted by the tests).
 6. **Player 1 moved to the number pad / `IOPKL,./` cluster**, Player 2 to `QWE/ASD/ZXC`; the original used
    `QWE/ASD/ZXC` for Player 1.
 7. **No external assets needed**: the ball sprite and the kick sound are generated. `ball.png` and the
@@ -164,15 +169,18 @@ No dependencies beyond Node (v24 used here). The rules and the AI live in one cl
 scripts lift out of the HTML and run head-less:
 
 ```
-node tools/selftest.mjs           # 50 checks: html wiring, pitch bytes, rules, undo, self-play, ladder
-node tools/selftest.mjs --fast    # 45 of them — skips the ladder matches, seconds instead of minutes
+node tools/selftest.mjs           # 57 checks: html wiring, pitch geometry and its boundary, rules, undo, self-play, ladder
+node tools/selftest.mjs --fast    # 52 of them — skips the ladder matches, seconds instead of minutes
 node tools/uismoke.mjs            # 12 checks: boots the interface on a stub DOM, drives the key pad and the hotkeys
 node tools/trace.mjs hard 800     # prints what the CPU is thinking in a hand-made position
 ```
 
-`selftest.mjs` asserts the pitch as it is played here — 404 lattice segments, exactly 44 printed ones
-(20 touchlines, 8 half-way, 12 goal-area lines, 4 posts), 360 playable, a three-dot goal mouth with its front
-open — that landing on a bare dot passes the turn while a lined dot is a bounce, that a dead-end bounce
+`selftest.mjs` asserts the pitch as it is played here — 404 lattice segments, exactly 44 drawn ones
+(20 touchlines, 8 half-way, 12 goal-area lines, 4 posts), 48 more lying outside that border and blocked
+without being drawn, 312 playable, and the rule that gives those numbers meaning: no unblocked stroke — not
+even at its middle — leaves the printed border, and the dots outside it are exactly the ones marked out of
+play, on all three pitch sizes. It also asserts a three-dot goal mouth with its front open, that landing on a
+bare dot passes the turn while a lined dot is a bounce, that a dead-end bounce
 loses, that an own goal is offered, scores for the other side and loses the match for whoever kicked it in,
 that the first goal ends the match with no kick-off, bit-for-bit undo, that every move the CPU produces is
 legal, that it never passes, and that games end by the rules. The strength ladder is a

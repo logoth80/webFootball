@@ -194,7 +194,7 @@
           <li>The ball sits on the grid crossings. A kick draws one straight pen stroke to any of the 8 neighbouring crossings.</li>
           <li>A stroke may be drawn <b>only once</b>, by anybody. Crossing other strokes is fine — re-drawing one is not.</li>
           <li>Land on a crossing that <b>already has a stroke</b> at it &rarr; <span style="color:var(--warn)">bounce!</span> you kick again. Land on a bare crossing &rarr; the other player takes over.</li>
-          <li>Goal = land the ball on one of the 3 goal-mouth dots of the goal you attack. <b>Next goal wins.</b> The printed pitch lines are real lines too: they block re-drawing and they bounce the ball.</li>
+          <li>Goal = land the ball on one of the 3 goal-mouth dots of the goal you attack. <b>Next goal wins.</b> The printed pitch lines are real lines too: they block re-drawing and they bounce the ball. The printed border is the pitch — the ball never leaves it.</li>
           <li>No legal stroke left? You lose. Kicking into your own goal loses too.</li>
         </ul>
       </details>
@@ -215,7 +215,8 @@
     vertical or diagonal). Every stroke may be drawn only once during the whole game — both players
     share the same paper. Landing on a crossing that already has any stroke attached (yours, your
     opponent's, or one of the printed pitch lines) is a <b>bounce</b>: you kick again, as many times as
-    you can keep hitting lined crossings. Landing on a bare crossing passes the turn.</p>
+    you can keep hitting lined crossings. Landing on a bare crossing passes the turn. The printed border
+    <b>is</b> the pitch: a kick may not leave it, so the ball always stays inside the lines you can see.</p>
 
     <h3>Scoring</h3>
     <p>Player 1 attacks the <b>top</b> goal, Player 2 / CPU the <b>bottom</b> one: land the ball on any of
@@ -247,15 +248,17 @@
     alpha-beta pruning, a transposition table and iterative deepening, and they answer a given position the
     same way every time. <b>Normal</b> (6 kicks deep) is about the strength the original CPU was aiming for.
     <b>Hard</b> (12) and <b>Expert</b> (26) search far deeper and take far longer per move; measured
-    head-to-head, though, depth alone does not win more matches, because the position evaluation is a
-    distance-and-open-space proxy — if you want a genuinely tougher CPU, the evaluator is what needs
-    improving, not the search. The status line reports the depth, node count and thinking time of every CPU
-    move, so what each level is doing is visible. Against the deeper levels expect to win by leaving the
-    opponent without a stroke rather than by goals — that is how this game is really decided.</p>
+    head-to-head, that depth does not decide the result on its own — on this pitch the deeper search took 4
+    of 4 against <b>Normal</b>, on the older pitch with the goal-area hatch the 6-ply level held its own —
+    because what decides those games is the position evaluation, a distance-and-open-space proxy. If you want
+    a genuinely tougher CPU, the evaluator is what needs improving, not the search. The status line reports
+    the depth, node count and thinking time of every CPU move, so what each level is doing is visible.
+    Against the deeper levels expect to win by leaving the opponent without a stroke rather than by goals —
+    that is how this game is really decided.</p>
 
     <h3>What changed compared to <code>football.pyw</code></h3>
     <ul>
-      <li>The goal-area hatch of the original is <b>not drawn and not played</b>. The pitch is the border, the half-way line, the goal-area lines and the two short post lines; the original's 36 faint diagonal and end-row segments next to the posts were decoration that happened to be playable lines. The printed border is enough to play by, and it leaves 360 rather than 324 free lines on the classic pitch.</li>
+      <li>The printed border <b>is the boundary of the pitch</b>. The original sealed the area around its goals with 36 faint diagonal and end-row segments beside the posts — decoration that happened to be legal lines, and the only thing keeping the ball inside the field, because a dozen strokes along the outer edge of its own goal line were playable. Here the pitch is the border, the half-way line, the goal-area lines and the two short post lines, and what that border encloses plus the goal mouths is the playing area: strokes that would leave it are blocked <i>without</i> being drawn, and the dots outside it are not drawn either. On the classic pitch 44 segments are drawn, 48 are off the pitch, and 312 stay free (the original allowed 324).</li>
       <li>The CPU searches with the opponent in the loop (the original scored only its own landing spot by distance to goal, and could walk into its own goal). It never passes when it has a legal kick; being stuck loses, as for a human.</li>
       <li>The <b>next goal wins</b>, and an own goal always loses the match for whoever kicked it in — no match-length or own-goal switches, because both are how the game is actually played. There is undo, hints, an event log and a rules panel.</li>
       <li>Player 1 moved to the number-pad / <code>IOPKL,./</code> cluster, Player 2 to <code>QWE/ASD/ZXC</code>.</li>
@@ -318,13 +321,12 @@
       }
     }
 
-    /* printed pitch — the original football.pyw layout, minus the goal-area hatch:
-       the border, the half-way line, the goal-area lines and the two post lines are enough
-       to play by, and 36 faint diagonal segments near the posts bought nothing. */
-    var pre = [], seen = new Set();
+    /* printed pitch — the border, the half-way line, the goal-area lines and the two post lines.
+       Nothing else is printed: the thick border is what defines the pitch. */
+    var pre = [], printed = [], seen = new Set();
     function add(c1, r1, c2, r2) {
       var ee = addEdge(idx(c1, r1), idx(c2, r2));
-      if (!seen.has(ee)) { seen.add(ee); pre.push(ee); }
+      if (!seen.has(ee)) { seen.add(ee); pre.push(ee); printed.push(ee); }
     }
     var cols = [0, W - 1], i;
     for (i = 0; i < 2; i++) for (r = 1; r <= H - 3; r++) add(cols[i], r, cols[i], r + 1);          /* sidelines, corner edges left open */
@@ -336,6 +338,26 @@
     }
     var posts = [gc - goalHalf, gc + goalHalf];
     for (i = 0; i < 2; i++) { add(posts[i], 0, posts[i], 1); add(posts[i], H - 2, posts[i], H - 1); }
+
+    /* The printed border is the pitch, so everything outside it is out of play: the dots beyond the
+       touchlines and the strips beside the goal boxes. Those strokes are blocked in the state and are
+       not drawn either, so the paper shows exactly what may be played. A stroke may not leave the
+       pitch — checked at its endpoints and at its middle — which is what the original enforced with
+       its faint goal-area hatch. */
+    function onPitch(x, y) {
+      if (y >= 1 && y <= H - 2) return true;                                       /* inside the touchlines */
+      return x >= gc - goalHalf && x <= gc + goalHalf && (y <= 1 || y >= H - 2);  /* between the posts */
+    }
+    var inPlay = new Uint8Array(N), hidden = [];
+    for (r = 0; r < H; r++) for (c = 0; c < W; c++) inPlay[idx(c, r)] = onPitch(c, r) ? 1 : 0;
+    for (e = 0; e < E; e++) {
+      if (seen.has(e)) continue;
+      var en = edgeNodes[e], na = en[0], nb = en[1];
+      var ax = na % W, ay = (na / W) | 0, bx = nb % W, by = (nb / W) | 0;
+      if (onPitch(ax, ay) && onPitch(bx, by) && onPitch((ax + bx) / 2, (ay + by) / 2)) continue;
+      seen.add(e); hidden.push(e);
+    }
+    pre = pre.concat(hidden);
 
     var goalNodes = [[], []], goalOwner = new Int8Array(N); for (e = 0; e < N; e++) goalOwner[e] = -1;
     for (c = gc - goalHalf; c <= gc + goalHalf; c++) {
@@ -352,12 +374,14 @@
       hdist[s][n] = best;
     }
     var preUsed = new Uint8Array(E); for (i = 0; i < pre.length; i++) preUsed[pre[i]] = 1;
+    var printVisible = new Uint8Array(E); for (i = 0; i < printed.length; i++) printVisible[printed[i]] = 1;
 
     return {
       cellCols: cw, cellRows: ch, W: W, H: H, N: N, E: E, gc: gc, gr: gr, goalHalf: goalHalf,
       idx: idx, center: idx(gc, gr), adjEdge: adjEdge, adjTo: adjTo,
       edgeNodes: edgeNodes, goalNodes: goalNodes, goalOwner: goalOwner, hdist: hdist,
-      preUsed: preUsed, preCount: pre.length, playable: E - pre.length
+      preUsed: preUsed, preCount: pre.length, playable: E - pre.length,
+      printVisible: printVisible, printCount: printed.length, inPlay: inPlay
     };
   }
 
@@ -922,9 +946,9 @@
       var gy = oy + row * cell; c.moveTo(0, gy + 0.5); c.lineTo(cwpx, gy + 0.5);
     }
     c.stroke();
-    /* node dots */
+    /* node dots — only where the game can actually be played */
     c.fillStyle = T.dots;
-    for (n = 0; n < board.N; n++) { c.beginPath(); c.arc(nx(n), ny(n), Math.max(1.1, cell * 0.045), 0, Math.PI * 2); c.fill(); }
+    for (n = 0; n < board.N; n++) { if (!board.inPlay[n]) continue; c.beginPath(); c.arc(nx(n), ny(n), Math.max(1.1, cell * 0.045), 0, Math.PI * 2); c.fill(); }
 
     /* goals. The two short lines at the posts are printed pitch lines; the net belongs
        between them — inside the goal frame, not hanging out of it — and the ball enters
@@ -948,9 +972,10 @@
     }
 
     /* printed pitch lines — one weight, one darkness: this is the printed border of the
-       pitch, and it is meant to read as heavier than anything the players draw */
+       pitch, and it is meant to read as heavier than anything the players draw. The other
+       blocked strokes are off the pitch, so they are not drawn at all. */
     for (i = 0; i < board.E; i++) {
-      if (!board.preUsed[i]) continue;
+      if (!board.printVisible[i]) continue;
       var en = board.edgeNodes[i];
       var x11 = nx(en[0]), y11 = ny(en[0]), x22 = nx(en[1]), y22 = ny(en[1]);
       pen(c, x11, y11, x22, y22, i * 1.7 + 0.3, T.ink, Math.max(1.6, cell * 0.055), 0.92);
