@@ -1,0 +1,112 @@
+/* Paper Football — the look: paper, pencil, the two inks.
+   The colour variables here are mirrored by THEMES in app.js, which draws the pitch on a canvas;
+   change one, change the other. */
+  :root{
+    --paper:#f3f5fb; --paper-field:#eef0fa; --grid:rgba(160,200,230,.78); --grid-soft:rgba(160,200,230,.42);
+    --ink:#1e0082; --ink-soft:rgba(30,0,130,.55); --p1:#000000; --p2:#0000c8; --warn:#c01414;
+    --panel:#fbfcff; --card:#ffffff; --line:rgba(30,0,130,.25); --shadow:0 2px 0 rgba(30,0,130,.12);
+    --header-bg:rgba(255,255,255,.55); --modal-bg:rgba(243,245,251,.94); --active:rgba(30,0,130,.5);
+    --btn-hover:#ffffff; --pill:rgba(30,0,130,.07);
+    --hand:Georgia,'Times New Roman',serif; --body:Arial,Helvetica,sans-serif; --mono:'Courier New',monospace;
+    color-scheme:light;
+  }
+  /* dark mode: the same game drawn on dark paper with a green and a pale-blue pencil.
+     Set on <html> by the Paper select in Settings (which also offers "follow the system"). */
+  :root[data-theme="dark"]{
+    --paper:#15171d; --paper-field:#171a20; --grid:rgba(130,158,196,.34); --grid-soft:rgba(130,158,196,.16);
+    --ink:#e9edf6; --ink-soft:rgba(214,224,242,.55); --p1:#4ed28c; --p2:#7fb0ff; --warn:#ff8080;
+    --panel:#1f232c; --card:#262b36; --line:rgba(214,224,242,.22); --shadow:0 2px 0 rgba(0,0,0,.45);
+    --header-bg:rgba(21,23,29,.60); --modal-bg:rgba(21,23,29,.95); --active:rgba(214,224,242,.45);
+    --btn-hover:#2a3140; --pill:rgba(214,224,242,.09);
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
+    /* one continuous sheet of graph paper: --gs/--gx/--gy are set by layout() so that
+       the page grid continues the canvas grid exactly */
+    background-image:
+      repeating-linear-gradient(90deg,transparent 0 calc(var(--gs,28px) - 1px),var(--grid-soft) calc(var(--gs,28px) - 1px) var(--gs,28px)),
+      repeating-linear-gradient(0deg,transparent 0 calc(var(--gs,28px) - 1px),var(--grid-soft) calc(var(--gs,28px) - 1px) var(--gs,28px));
+    background-position:var(--gx,0px) var(--gy,0px);
+    display:flex;flex-direction:column;
+  }
+  header{
+    display:flex;align-items:center;gap:16px;padding:10px 14px;border-bottom:2px solid var(--ink);
+    background:var(--header-bg);flex-wrap:wrap
+  }
+  h1{font-family:var(--hand);font-style:italic;font-size:23px;margin:0;letter-spacing:.3px;white-space:nowrap}
+  .score{display:flex;gap:10px;align-items:center;margin-left:6px}
+  .sbox{border:2px solid var(--ink);border-radius:4px;background:var(--panel);padding:3px 9px;min-width:96px;box-shadow:var(--shadow)}
+  .sbox b{font-family:var(--hand);font-size:13px;display:block;line-height:1.1}
+  .sbox i{font-style:normal;font-size:26px;font-family:var(--hand);display:block;text-align:center}
+  .sbox.p1 b{color:var(--p1)} .sbox.p2 b{color:var(--p2)}
+  .sbox.active{outline:2px dashed var(--active);outline-offset:2px}
+  .tools{margin-left:auto;display:flex;gap:9px;flex-wrap:wrap}
+  /* the toolbar: big enough to hit reliably, quiet enough to stay out of the game's way */
+  button{
+    display:inline-flex;align-items:center;gap:9px;min-height:42px;padding:10px 15px;
+    font-family:var(--body);font-size:14px;font-weight:600;letter-spacing:.2px;
+    color:var(--ink);background:var(--panel);border:1.5px solid var(--ink);border-radius:11px;
+    cursor:pointer;box-shadow:var(--shadow);transition:background .12s,box-shadow .12s,transform .08s
+  }
+  button:hover:not(:disabled){background:var(--btn-hover);box-shadow:0 3px 8px rgba(0,0,0,.16)}
+  button:active:not(:disabled){transform:translateY(1px);box-shadow:none}
+  button:disabled{opacity:.35;cursor:default;box-shadow:none}
+  button kbd{
+    font-family:var(--mono);font-size:11px;font-weight:400;line-height:1.6;color:var(--ink-soft);
+    background:var(--pill);border:1px solid var(--line);border-radius:6px;padding:1px 6px
+  }
+  @media (max-width:1080px){header{gap:10px}.tools{gap:6px}}
+  main{flex:1;display:flex;gap:14px;padding:12px 14px 16px;min-height:0}
+  .boardwrap{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0}
+  canvas{background:var(--paper-field);touch-action:manipulation}
+  aside{width:308px;flex:0 0 308px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+  .panel{border:1.5px solid var(--line);background:var(--panel);border-radius:3px;padding:9px 10px;box-shadow:var(--shadow)}
+  .panel h2{font-family:var(--hand);font-size:13px;margin:0 0 7px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-soft)}
+  #status{font-family:var(--hand);font-size:17px;line-height:1.35;min-height:44px}
+  #status .again{color:var(--warn)}
+  #substatus{font-family:var(--body);font-size:11px;color:var(--ink-soft);margin-top:5px;line-height:1.4}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:230px}
+  .pad .k{
+    border:1.5px solid var(--ink);border-radius:3px;background:var(--card);padding:5px 3px;text-align:center;
+    font-size:11px;line-height:1.25;cursor:pointer;user-select:none;min-height:38px;display:flex;flex-direction:column;justify-content:center
+  }
+  .pad .k small{font-size:9px;color:var(--ink-soft)}
+  .pad .k.hintable:hover{background:#fffbe8}
+  .pad .k.dead{opacity:.32;cursor:default}
+  .pad .mid{border:1px dashed var(--line);background:transparent;font-size:10px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;border-radius:3px}
+  .padwrap.p1 .k{border-color:var(--p1);color:var(--p1)} .padwrap.p2 .k{border-color:var(--p2);color:var(--p2)}
+  .padwrap.idle .k{opacity:.4}
+  form.set{display:grid;grid-template-columns:1fr;gap:7px}
+  form.set label{font-size:11px;display:flex;flex-direction:column;gap:3px;color:var(--ink-soft)}
+     select{font-family:var(--body);font-size:14px;color:var(--ink);border:1.5px solid var(--line);
+     border-radius:9px;background:var(--card);padding:8px 10px;min-height:38px;width:100%}
+   select:hover{border-color:var(--ink)}
+   input[type=checkbox]{width:16px;height:16px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .chk{flex-direction:row!important;align-items:center;gap:6px!important}
+  #log{font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink);max-height:132px;overflow:auto;white-space:pre-wrap}
+  #log .g1{color:var(--p1)} #log .g2{color:var(--p2)} #log .w{color:var(--warn)}
+  details.rules summary{cursor:pointer;font-family:var(--hand);font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft)}
+  details.rules{font-size:12.5px;line-height:1.5}
+  details.rules ul{margin:6px 0 0 16px;padding:0}
+  details.rules h3{font-family:var(--hand);font-size:13px;margin:10px 0 3px}
+  .modal{position:fixed;inset:0;background:var(--modal-bg);z-index:20;overflow:auto;padding:26px}
+  .modal[hidden]{display:none}
+  .modal .inner{max-width:760px;margin:0 auto;border:2px solid var(--ink);background:var(--panel);padding:18px 20px;border-radius:3px}
+  .modal h2{font-family:var(--hand);margin:0 0 4px}
+  .modal h3{font-family:var(--hand);font-size:15px;margin:16px 0 4px}
+  .modal p,.modal li{font-size:13px;line-height:1.55}
+  .close{position:sticky;top:0;float:right}
+  .foot{font-size:11px;color:var(--ink-soft);margin-top:12px}
+  @media (max-width:900px){
+    /* a narrow window stacks the panel under the sheet; the page then scrolls, it does not
+       shrink the pitch into a strip */
+    body{height:auto;min-height:100%}
+    main{flex-direction:column}
+    aside{width:auto;flex:0 0 auto;overflow:visible}
+    .boardwrap{flex:0 0 auto;min-height:62vh}
+    .padwrap{display:inline-block}
+  }
