@@ -84,7 +84,7 @@
       kept deep rather than pastel, so on dark paper they still read as lead and not as highlighter. applyTheme() swaps the palette and repaints. */
   var THEMES = {
     light: { field:'#eef0fa', grid:'rgba(160,200,230,.72)', dots:'rgba(30,0,130,.16)', fibre:'rgba(30,0,130,',
-             ink:'#1e0082', p1:'#2b2d38', p2:'#0000c8', warn:'#c01414',
+             ink:'#1e0082', p1:'#2b2d38', p2:'#2f5fd0', warn:'#c01414',
              toast:'rgba(30,0,130,.75)', veil:'rgba(238,240,250,.72)', shadow:'rgba(30,0,130,0.14)' },
     dark:  { field:'#171a20', grid:'rgba(130,158,196,.34)', dots:'rgba(214,224,242,.20)', fibre:'rgba(255,255,255,',
              ink:'#e9edf6', p1:'#2fb877', p2:'#5f93ee', warn:'#ff8080',

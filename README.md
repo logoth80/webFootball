@@ -31,10 +31,11 @@ the first one kept light enough that the strokes still read as drawn on paper ra
 
 ![The opening pitch on the sheet](preview.png)
 
-The end of a demo game — the CPU playing both sides — opened with `#demo`. The line under the status reports the
-depth, the positions searched and the thinking time of every CPU move; this one is the last move of the game, and
-it searched not one new position, because that position had already been proved while the CPU was working out
-earlier kicks:
+A demo game in progress, opened with `#demo` — the CPU playing both sides, one pen each. The two lines under the
+status say what it is really doing: the first is the search that decided the last kick (proved to 16 plies,
+101 352 positions, 0.1 s), the second is the search running right now, written while it works — 15 of 16 plies
+so far. The red "bounce — kick again!" is the only thing still in red, because it describes the state of the ball
+rather than who is winning:
 
 ![CPU against CPU](preview-demo.png)
 
@@ -71,7 +72,7 @@ exists as a button, an on-screen 3×3 key pad, or a click/tap on the hollow dot 
   of play), big 10 × 16.
 * **Show legal dots** — the faint rings next to the ball; turn them off for a real pen-and-paper feel.
 * **Paper** — light graph paper (the default, close to the original's look: Player 1 in a graphite pencil a
-  shade off its black, Player 2 in the same blue), dark paper (Player 1 in a deep green pencil, Player 2 in a
+  shade off its black, Player 2 in a lighter ballpoint blue (#2f5fd0), never mistaken for the printed pitch), dark paper (Player 1 in a deep green pencil, Player 2 in a
   deep blue — graphite would be invisible there, and pastels stop looking like pencil), or follow the system's
   light/dark setting. The canvas, the panels and the page grid all
   switch together, and the switch is instant: the sheet is re-drawn, not re-loaded.
@@ -265,6 +266,9 @@ Compared with `football.pyw`, these are choices, not accidents (the numbering fo
    to the original green, kept deep rather than pastel.
 10. **The players' strokes are lighter than the printed pitch** — a pencil line drawn over pre-printed graph
     paper is thinner than the print, and keeping the print heavier makes it obvious which lines are not yours.
+     Measured against the field: the printed ink 13.4:1, Player 1's graphite 12.0:1, Player 2's blue 5.0:1. The
+     pitch stays the darkest thing on the sheet, and the blue is deliberately the lightest line in the game —
+     it is the one pen that shares its hue with the print.
 11. **The net is drawn inside the goal frame** — between the two short post lines, the way you would actually
     sketch it on paper — instead of hanging outside the pitch.
 12. **Dark paper exists** (Settings → Paper, or `#dark`): the same pitch, rules and geometry drawn with a
