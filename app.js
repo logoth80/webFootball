@@ -79,14 +79,15 @@
   function nameOf(side) { return isHuman(side) ? (side === 0 ? 'Player 1' : 'Player 2') : 'CPU'; }
   function colorOf(side) { return side === 0 ? T.p1 : T.p2; }
   /* The sheet is hand-drawn on a canvas, so its palette is spelled out here too (the CSS
-     variables cover the panels around it). Light is ballpoint on graph paper, black and blue; on dark paper, where black would be
-     invisible, Player 1 is a green pencil (football.pyw's colour for that side) and Player 2 stays blue. applyTheme() swaps the palette and repaints. */
+     variables cover the panels around it). Light is pencil on graph paper, graphite and blue; on dark paper, where graphite would be
+     invisible, Player 1 is a green pencil (football.pyw's colour for that side) and Player 2 a deep blue — both
+      kept deep rather than pastel, so on dark paper they still read as lead and not as highlighter. applyTheme() swaps the palette and repaints. */
   var THEMES = {
     light: { field:'#eef0fa', grid:'rgba(160,200,230,.72)', dots:'rgba(30,0,130,.16)', fibre:'rgba(30,0,130,',
-             ink:'#1e0082', p1:'#000000', p2:'#0000c8', warn:'#c01414',
+             ink:'#1e0082', p1:'#2b2d38', p2:'#0000c8', warn:'#c01414',
              toast:'rgba(30,0,130,.75)', veil:'rgba(238,240,250,.72)', shadow:'rgba(30,0,130,0.14)' },
     dark:  { field:'#171a20', grid:'rgba(130,158,196,.34)', dots:'rgba(214,224,242,.20)', fibre:'rgba(255,255,255,',
-             ink:'#e9edf6', p1:'#4ed28c', p2:'#7fb0ff', warn:'#ff8080',
+             ink:'#e9edf6', p1:'#2fb877', p2:'#5f93ee', warn:'#ff8080',
              toast:'rgba(226,233,246,.85)', veil:'rgba(21,23,29,.78)', shadow:'rgba(0,0,0,.45)' }
   };
   var T = THEMES.light;
@@ -388,7 +389,9 @@
     if (match.over) {
       ctx.fillStyle = T.veil; ctx.fillRect(0, 0, cwpx, chpx);
       ctx.textAlign = 'center';
-      ctx.fillStyle = T.warn;
+      /* the winner announced in the winner's own pen, not in a red stamp: on this sheet the colour
+         of a side is already the only thing that says who drew what */
+      ctx.fillStyle = colorOf(match.winner);
       ctx.font = 'bold ' + Math.round(cell * 1.05) + 'px Cambria, Georgia, serif';
       ctx.fillText(nameOf(match.winner) + ' won!', cwpx / 2, chpx / 2 - cell * 0.2);
       ctx.fillStyle = T.ink; ctx.font = 'italic ' + Math.round(cell * 0.42) + 'px Georgia, serif';
@@ -452,7 +455,7 @@
       toast = { text: evt.ownGoal ? 'own goal!' : 'GOAL!', color: T.warn, until: lastTs + 1400 };
     }
     if (evt.bounce && !evt.goal) flash = { until: lastTs + 900 };
-    if (evt.stuck) logLine('no stroke left — ' + nameOf(match.winner) + ' wins', 'w');
+    if (evt.stuck) logLine('no stroke left — ' + nameOf(match.winner) + ' wins', match.winner === 0 ? 'g1' : 'g2');
   }
   function logLine(text, cls) {
     logLines.push({ text: text, cls: cls });
@@ -540,7 +543,7 @@
     if (phase !== 'think') return;
     if (!mv) {
       match.over = true; match.winner = match.ps.side ^ 1; match.reason = 'no strokes left';
-      logLine('no stroke left — ' + nameOf(match.winner) + ' wins', 'w');
+      logLine('no stroke left — ' + nameOf(match.winner) + ' wins', match.winner === 0 ? 'g1' : 'g2');
       phase = 'over'; refreshUi(); return;
     }
     lastAiInfo = aiInfo(mv);

@@ -1,20 +1,25 @@
 /* Paper Football — the look: paper, pencil, the two inks.
+   On light paper the human's pen is graphite (#2b2d38), a shade off pure black: the strokes should
+   still read as drawn on paper with a pencil, not printed on it with a marker.
    The colour variables here are mirrored by THEMES in app.js, which draws the pitch on a canvas;
    change one, change the other. */
   :root{
     --paper:#f3f5fb; --paper-field:#eef0fa; --grid:rgba(160,200,230,.78); --grid-soft:rgba(160,200,230,.42);
-    --ink:#1e0082; --ink-soft:rgba(30,0,130,.55); --p1:#000000; --p2:#0000c8; --warn:#c01414;
+    --ink:#1e0082; --ink-soft:rgba(30,0,130,.55); --p1:#2b2d38; --p2:#0000c8; --warn:#c01414;
     --panel:#fbfcff; --card:#ffffff; --line:rgba(30,0,130,.25); --shadow:0 2px 0 rgba(30,0,130,.12);
     --header-bg:rgba(255,255,255,.55); --modal-bg:rgba(243,245,251,.94); --active:rgba(30,0,130,.5);
     --btn-hover:#ffffff; --pill:rgba(30,0,130,.07);
     --hand:Georgia,'Times New Roman',serif; --body:Arial,Helvetica,sans-serif; --mono:'Courier New',monospace;
     color-scheme:light;
   }
-  /* dark mode: the same game drawn on dark paper with a green and a pale-blue pencil.
-     Set on <html> by the Paper select in Settings (which also offers "follow the system"). */
+  /* dark mode: the same game drawn on dark paper with a deep green and a deep blue pencil.  Both are
+     kept deep rather than pastel — by the WCAG relative-luminance formula they measure 6.8:1 (green)
+     and 5.7:1 (blue) against the field, so they are still comfortably readable, while a pastel would
+     stop looking like pencil and start looking like a highlighter. Set on <html> by the Paper select in
+     Settings (which also offers "follow the system"). */
   :root[data-theme="dark"]{
     --paper:#15171d; --paper-field:#171a20; --grid:rgba(130,158,196,.34); --grid-soft:rgba(130,158,196,.16);
-    --ink:#e9edf6; --ink-soft:rgba(214,224,242,.55); --p1:#4ed28c; --p2:#7fb0ff; --warn:#ff8080;
+    --ink:#e9edf6; --ink-soft:rgba(214,224,242,.55); --p1:#2fb877; --p2:#5f93ee; --warn:#ff8080;
     --panel:#1f232c; --card:#262b36; --line:rgba(214,224,242,.22); --shadow:0 2px 0 rgba(0,0,0,.45);
     --header-bg:rgba(21,23,29,.60); --modal-bg:rgba(21,23,29,.95); --active:rgba(214,224,242,.45);
     --btn-hover:#2a3140; --pill:rgba(214,224,242,.09);
@@ -88,7 +93,7 @@
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
   .chk{flex-direction:row!important;align-items:center;gap:6px!important}
   #log{font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink);max-height:132px;overflow:auto;white-space:pre-wrap}
-  #log .g1{color:var(--p1)} #log .g2{color:var(--p2)} #log .w{color:var(--warn)}
+  #log .g1{color:var(--p1)} #log .g2{color:var(--p2)}
   details.rules summary{cursor:pointer;font-family:var(--hand);font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft)}
   details.rules{font-size:12.5px;line-height:1.5}
   details.rules ul{margin:6px 0 0 16px;padding:0}

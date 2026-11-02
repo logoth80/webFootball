@@ -25,17 +25,21 @@ strength for that opening, and `index.html#dark` opens it on dark paper. Combine
 `index.html#demo#level=master`.
 
 The whole window is one sheet of graph paper — the page background grid is re-scaled to the pitch grid,
-and the pitch is drawn centred on the sheet, as it would be on a real exercise page. Player 1 plays in black,
-Player 2 in blue, which is what the game is actually played with: one black and one blue ballpoint.
+and the pitch is drawn centred on the sheet, as it would be on a real exercise page. Player 1 plays with a
+graphite pencil a shade off black, Player 2 with a blue pen — the two pens this game is actually played with,
+the first one kept light enough that the strokes still read as drawn on paper rather than printed on it.
 
 ![The opening pitch on the sheet](preview.png)
 
-A game in progress, opened with `#demo` (the status line reports the CPU's depth, positions searched and
-thinking time after every move):
+The end of a demo game — the CPU playing both sides — opened with `#demo`. The line under the status reports the
+depth, the positions searched and the thinking time of every CPU move; this one is the last move of the game, and
+it searched not one new position, because that position had already been proved while the CPU was working out
+earlier kicks:
 
 ![CPU against CPU](preview-demo.png)
 
-The same sheet drawn with a green and a pale-blue pencil, opened with `#dark` or chosen under Settings → Paper:
+The same finished demo on dark paper, where graphite would be invisible so the two pens are a deep green and a
+deep blue — opened with `#dark` or chosen under Settings → Paper:
 
 ![The same pitch on dark paper](preview-dark.png)
 
@@ -66,9 +70,10 @@ exists as a button, an on-screen 3×3 key pad, or a click/tap on the hollow dot 
 * **Pitch** — small 6 × 10, classic 8 × 12 (the original board, with the area outside its border taken out
   of play), big 10 × 16.
 * **Show legal dots** — the faint rings next to the ball; turn them off for a real pen-and-paper feel.
-* **Paper** — light graph paper (the default, and the look of the original: Player 1 in a black pen, Player 2
-  in a blue one), dark paper (Player 1 in a green pencil, Player 2 in pale blue, because black would be
-  invisible there), or follow the system's light/dark setting. The canvas, the panels and the page grid all
+* **Paper** — light graph paper (the default, close to the original's look: Player 1 in a graphite pencil a
+  shade off its black, Player 2 in the same blue), dark paper (Player 1 in a deep green pencil, Player 2 in a
+  deep blue — graphite would be invisible there, and pastels stop looking like pencil), or follow the system's
+  light/dark setting. The canvas, the panels and the page grid all
   switch together, and the switch is instant: the sheet is re-drawn, not re-loaded.
 
 Settings and the pitch you chose are remembered in `localStorage`. Three things are deliberately **not**
@@ -253,15 +258,18 @@ Compared with `football.pyw`, these are choices, not accidents (the numbering fo
 7. **No external assets needed**: the ball sprite and the kick sound are generated. `ball.png` and the
    `.wav` files are only used when they can be fetched (http serving).
 8. The AI delay bug (`1500 - waited*10000`) is gone; the CPU's thinking is sliced and never blocks drawing.
-9. **On light paper Player 1 draws in black, not green.** The original used green for Player 1 and blue for
-   Player 2. The real game is played with one black and one blue ballpoint, and black reads better on graph
-   paper. Where black would be invisible — the dark sheet — Player 1 goes back to the original green.
+9. **On light paper Player 1 draws in graphite, not green.** The original used green for Player 1 and blue for
+   Player 2. The real game is played with one black and one blue pen, and a dark pen reads better on graph
+   paper than green does. Player 1's ink is a shade off pure black (#2b2d38), so the strokes read as drawn on
+   the sheet rather than printed onto it. Where graphite would be invisible — the dark sheet — Player 1 goes back
+   to the original green, kept deep rather than pastel.
 10. **The players' strokes are lighter than the printed pitch** — a pencil line drawn over pre-printed graph
     paper is thinner than the print, and keeping the print heavier makes it obvious which lines are not yours.
 11. **The net is drawn inside the goal frame** — between the two short post lines, the way you would actually
     sketch it on paper — instead of hanging outside the pitch.
 12. **Dark paper exists** (Settings → Paper, or `#dark`): the same pitch, rules and geometry drawn with a
-    green and a pale-blue pencil. Light remains the default.
+    green and a deep blue pencil — deep rather than pastel, so they still read as pencil on dark paper.
+     Light remains the default.
 
 Unchanged on purpose: the rest of the pitch geometry, the 8-direction single-segment kick, the shared
 once-only strokes, the bounce/pass rule, the goal mouth of three dots, and the general ballpoint-on-graph-paper
