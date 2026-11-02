@@ -1,0 +1,1493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Football — pen &amp; paper football game</title>
+<!--
+  Paper Football — a self-contained HTML/JS rewrite of football.pyw (see RULES.md for the rules
+  that were reverse-engineered from the original). Same pen-on-graph-paper look, complete rule
+  engine, and a real game-tree AI with selectable strength.
+  Everything lives in this file: no CDN, no build step, no external assets (kick sounds are
+  synthesised, and the original kick (n).wav files are used automatically when served over http).
+-->
+<style>
+  :root{
+    --paper:#f3f5fb; --paper-field:#eef0fa; --grid:rgba(160,200,230,.78); --grid-soft:rgba(160,200,230,.42);
+    --ink:#1e0082; --ink-soft:rgba(30,0,130,.55); --p1:#000000; --p2:#0000c8; --warn:#c01414;
+    --panel:#fbfcff; --card:#ffffff; --line:rgba(30,0,130,.25); --shadow:0 2px 0 rgba(30,0,130,.12);
+    --header-bg:rgba(255,255,255,.55); --modal-bg:rgba(243,245,251,.94); --active:rgba(30,0,130,.5);
+    --hand:Georgia,'Times New Roman',serif; --body:Arial,Helvetica,sans-serif; --mono:'Courier New',monospace;
+    color-scheme:light;
+  }
+  /* dark mode: the same game drawn on dark paper with a white and a pale-blue pencil.
+     Set on <html> by the theme select in Settings (or by the OS preference on first run). */
+  :root[data-theme="dark"]{
+    --paper:#15171d; --paper-field:#171a20; --grid:rgba(130,158,196,.34); --grid-soft:rgba(130,158,196,.16);
+    --ink:#e9edf6; --ink-soft:rgba(214,224,242,.55); --p1:#f4f6fa; --p2:#7fb0ff; --warn:#ff8080;
+    --panel:#1f232c; --card:#262b36; --line:rgba(214,224,242,.22); --shadow:0 2px 0 rgba(0,0,0,.45);
+    --header-bg:rgba(21,23,29,.60); --modal-bg:rgba(21,23,29,.95); --active:rgba(214,224,242,.45);
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
+    /* one continuous sheet of graph paper: --gs/--gx/--gy are set by layout() so that
+       the page grid continues the canvas grid exactly */
+    background-image:
+      repeating-linear-gradient(90deg,transparent 0 calc(var(--gs,28px) - 1px),var(--grid-soft) calc(var(--gs,28px) - 1px) var(--gs,28px)),
+      repeating-linear-gradient(0deg,transparent 0 calc(var(--gs,28px) - 1px),var(--grid-soft) calc(var(--gs,28px) - 1px) var(--gs,28px));
+    background-position:var(--gx,0px) var(--gy,0px);
+    display:flex;flex-direction:column;
+  }
+  header{
+    display:flex;align-items:center;gap:14px;padding:8px 14px;border-bottom:2px solid var(--ink);
+    background:var(--header-bg);flex-wrap:wrap
+  }
+  h1{font-family:var(--hand);font-style:italic;font-size:22px;margin:0;letter-spacing:.3px;white-space:nowrap}
+  h1 small{font-family:var(--body);font-style:normal;font-size:11px;color:var(--ink-soft);letter-spacing:0}
+  .score{display:flex;gap:10px;align-items:center;margin-left:6px}
+  .sbox{border:2px solid var(--ink);border-radius:3px;background:var(--panel);padding:3px 9px;min-width:96px;box-shadow:var(--shadow)}
+  .sbox b{font-family:var(--hand);font-size:13px;display:block;line-height:1.1}
+  .sbox i{font-style:normal;font-size:26px;font-family:var(--hand);display:block;text-align:center}
+  .sbox.p1 b{color:var(--p1)} .sbox.p2 b{color:var(--p2)}
+  .sbox.active{outline:2px dashed var(--active);outline-offset:2px}
+  .badge{font-family:var(--hand);font-size:13px;border:1px dashed var(--line);padding:3px 8px;border-radius:3px;color:var(--ink-soft)}
+  @media (max-width:1080px){.badge{display:none}h1 small{display:none}}
+  .tools{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  button{
+    font-family:var(--body);font-size:12px;color:var(--ink);background:var(--panel);
+    border:1.5px solid var(--ink);border-radius:3px;padding:5px 9px;cursor:pointer;box-shadow:var(--shadow)
+  }
+  button:hover{background:#fff}
+  button:active{transform:translateY(1px);box-shadow:none}
+  button:disabled{opacity:.4;cursor:default;box-shadow:none}
+  button kbd{font-family:var(--mono);font-size:10px;opacity:.7}
+  main{flex:1;display:flex;gap:14px;padding:12px 14px 16px;min-height:0}
+  .boardwrap{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0}
+  canvas{background:var(--paper-field);touch-action:manipulation}
+  aside{width:308px;flex:0 0 308px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+  .panel{border:1.5px solid var(--line);background:var(--panel);border-radius:3px;padding:9px 10px;box-shadow:var(--shadow)}
+  .panel h2{font-family:var(--hand);font-size:13px;margin:0 0 7px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-soft)}
+  #status{font-family:var(--hand);font-size:17px;line-height:1.35;min-height:44px}
+  #status .again{color:var(--warn)}
+  #substatus{font-family:var(--body);font-size:11px;color:var(--ink-soft);margin-top:5px;line-height:1.4}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:230px}
+  .pad .k{
+    border:1.5px solid var(--ink);border-radius:3px;background:var(--card);padding:5px 3px;text-align:center;
+    font-size:11px;line-height:1.25;cursor:pointer;user-select:none;min-height:38px;display:flex;flex-direction:column;justify-content:center
+  }
+  .pad .k small{font-size:9px;color:var(--ink-soft)}
+  .pad .k.hintable:hover{background:#fffbe8}
+  .pad .k.dead{opacity:.32;cursor:default}
+  .pad .mid{border:1px dashed var(--line);background:transparent;font-size:10px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;border-radius:3px}
+  .padwrap.p1 .k{border-color:var(--p1);color:var(--p1)} .padwrap.p2 .k{border-color:var(--p2);color:var(--p2)}
+  .padwrap.idle .k{opacity:.4}
+  form.set{display:grid;grid-template-columns:1fr;gap:7px}
+  form.set label{font-size:11px;display:flex;flex-direction:column;gap:3px;color:var(--ink-soft)}
+  select,input[type=checkbox]{font-family:var(--body);font-size:12px;color:var(--ink);border:1.2px solid var(--line);border-radius:3px;background:var(--card);padding:4px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .chk{flex-direction:row!important;align-items:center;gap:6px!important}
+  #log{font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink);max-height:132px;overflow:auto;white-space:pre-wrap}
+  #log .g1{color:var(--p1)} #log .g2{color:var(--p2)} #log .w{color:var(--warn)}
+  details.rules summary{cursor:pointer;font-family:var(--hand);font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft)}
+  details.rules{font-size:12.5px;line-height:1.5}
+  details.rules ul{margin:6px 0 0 16px;padding:0}
+  details.rules h3{font-family:var(--hand);font-size:13px;margin:10px 0 3px}
+  .modal{position:fixed;inset:0;background:var(--modal-bg);z-index:20;overflow:auto;padding:26px}
+  .modal[hidden]{display:none}
+  .modal .inner{max-width:760px;margin:0 auto;border:2px solid var(--ink);background:var(--panel);padding:18px 20px;border-radius:3px}
+  .modal h2{font-family:var(--hand);margin:0 0 4px}
+  .modal h3{font-family:var(--hand);font-size:15px;margin:16px 0 4px}
+  .modal p,.modal li{font-size:13px;line-height:1.55}
+  .close{position:sticky;top:0;float:right}
+  .foot{font-size:11px;color:var(--ink-soft);margin-top:12px}
+  @media (max-width:900px){
+    /* a narrow window stacks the panel under the sheet; the page then scrolls, it does not
+       shrink the pitch into a strip */
+    body{height:auto;min-height:100%}
+    main{flex-direction:column}
+    aside{width:auto;flex:0 0 auto;overflow:visible}
+    .boardwrap{flex:0 0 auto;min-height:62vh}
+    .padwrap{display:inline-block}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Paper Football <small>pen &amp; paper football — HTML rewrite of <code>football.pyw</code></small></h1>
+  <div class="score">
+    <div class="sbox p1" id="box1"><b>Player 1</b><i id="sc1">0</i></div>
+    <div class="sbox p2" id="box2"><b>Player 2</b><i id="sc2">0</i></div>
+  </div>
+  <div class="badge" id="target"></div>
+  <div class="tools">
+    <button id="bNew">New game <kbd>R</kbd></button>
+    <button id="bUndo">Undo <kbd>U</kbd></button>
+    <button id="bHint">Hint <kbd>H</kbd></button>
+    <button id="bMode">vs CPU <kbd>F3</kbd></button>
+    <button id="bSound">Sound on <kbd>M</kbd></button>
+    <button id="bHelp">Rules &amp; keys <kbd>F1</kbd></button>
+  </div>
+</header>
+
+<main>
+  <div class="boardwrap" id="boardwrap"><canvas id="field"></canvas></div>
+
+  <aside>
+    <div class="panel">
+      <h2>Match</h2>
+      <div id="status">…</div>
+      <div id="substatus"></div>
+    </div>
+
+    <div class="panel">
+      <h2 id="padTitle">Your keys</h2>
+      <div class="padwrap" id="padwrap"><div class="pad" id="pad"></div></div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:6px">Click the keys, click a dot next to the ball, or use the keyboard.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Settings</h2>
+      <form class="set" id="settings" autocomplete="off">
+        <label>Opponent
+          <select id="selMode">
+            <option value="youP1">Solo — you are Player 1 (black ink, top goal)</option>
+            <option value="youP2">Solo — you are Player 2 (blue ink, bottom goal)</option>
+            <option value="2p">Two players on one keyboard</option>
+            <option value="demo">Watch: CPU vs CPU</option>
+          </select>
+        </label>
+        <label>CPU strength
+          <select id="selLevel"></select>
+        </label>
+        <div class="row2">
+          <label>Pitch
+            <select id="selBoard">
+              <option value="6,10">Small 6 × 10</option>
+              <option value="8,12">Classic 8 × 12 (as the original)</option>
+              <option value="10,16">Big 10 × 16</option>
+            </select>
+          </label>
+          <label>Match
+            <select id="selMatch">
+              <option value="1">Next goal wins</option>
+              <option value="3">First to 3 goals</option>
+              <option value="5">First to 5 goals</option>
+              <option value="0">Play until the paper is full</option>
+            </select>
+          </label>
+        </div>
+        <div class="row2">
+          <label>Own goals
+            <select id="selOwn">
+              <option value="allow">allowed (they win for the other side)</option>
+              <option value="forbid">forbidden kicks</option>
+            </select>
+          </label>
+          <label>&nbsp;</label>
+        </div>
+        <label>Paper
+          <select id="selTheme">
+            <option value="light">light graph paper</option>
+            <option value="dark">dark paper</option>
+            <option value="auto">follow the system's light/dark setting</option>
+          </select>
+        </label>
+        <label style="justify-content:flex-end">
+          <span class="chk"><input type="checkbox" id="chkHints" checked> show legal dots</span>
+        </label>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Paper log</h2>
+      <div id="log"></div>
+    </div>
+
+    <div class="panel">
+      <details class="rules">
+        <summary>Rules in short</summary>
+        <ul>
+          <li>The ball sits on the grid crossings. A kick draws one straight pen stroke to any of the 8 neighbouring crossings.</li>
+          <li>A stroke may be drawn <b>only once</b>, by anybody. Crossing other strokes is fine — re-drawing one is not.</li>
+          <li>Land on a crossing that <b>already has a stroke</b> at it &rarr; <span style="color:var(--warn)">bounce!</span> you kick again. Land on a bare crossing &rarr; the other player takes over.</li>
+          <li>Goal = land the ball on one of the 3 goal-mouth dots of the goal you attack. The pitch is hatched near each goal: those hatch lines are real (they block re-drawing and they create bounces).</li>
+          <li>No legal stroke left? You lose. Kicking into your own goal loses too.</li>
+        </ul>
+      </details>
+    </div>
+  </aside>
+</main>
+
+<div class="modal" id="help" hidden>
+  <div class="inner">
+    <button class="close" id="bHelpClose">Close</button>
+    <h2>Paper Football — rules &amp; keys</h2>
+    <p>The pen-and-paper game: a ball on a lattice of grid crossings, two pens. Full rules of the
+    original Python version are in <code>RULES.md</code>; this file implements the same rules with the
+    ambiguities resolved as noted below.</p>
+
+    <h3>Kicking</h3>
+    <p>A kick is one straight stroke from the ball to any of the 8 neighbouring crossings (horizontal,
+    vertical or diagonal). Every stroke may be drawn only once during the whole game — both players
+    share the same paper. Landing on a crossing that already has any stroke attached (yours, your
+    opponent's, or one of the printed pitch lines) is a <b>bounce</b>: you kick again, as many times as
+    you can keep hitting lined crossings. Landing on a bare crossing passes the turn.</p>
+
+    <h3>Scoring</h3>
+    <p>Player 1 (black ink) attacks the <b>top</b> goal, Player 2 / CPU (blue ink) the <b>bottom</b> one: land the
+    ball on any of the three goal-mouth dots. A goal is followed by a kick-off from the centre for the
+    player who was scored against; the strokes already on the paper stay there. A player with no legal
+    stroke left loses the match, which is also how a full pitch ends. Kicking into your own goal wins for
+    the other side (or is an illegal kick, if you turn own goals off).</p>
+
+    <h3>Keys</h3>
+    <p><b>Player 1</b> — the right-hand cluster: <code>I O P</code> / <code>K L</code> (or <code>;</code>) /
+    <code>, . /</code>, or the <b>number pad</b> <code>7 8 9 / 4 6 / 1 2 3</code>, or the arrow keys for the
+    four straight directions.<br>
+    <b>Player 2</b> — the left-hand cluster: <code>Q W E</code> / <code>A D</code> / <code>Z X C</code>.</p>
+    <p>Other keys: <code>H</code> hint (or <code>T</code>), <code>F3</code> switch Player 2 &harr; CPU,
+    <code>R</code> new game, <code>U</code> undo, <code>M</code> sound, <code>F1</code> this panel,
+    <code>Esc</code> closes it. <code>/</code> and <code>?</code> belong to Player 1, so the panel is not on
+    <code>?</code>. On a phone or tablet use the on-screen key pad, or simply tap the highlighted dot you
+    want to kick to.</p>
+    <p><b>Paper:</b> Settings &rarr; Paper draws the whole thing again in dark — the same pitch in white and
+    pale-blue pencil on dark paper — or in light, which is the default; "follow the system" tracks your
+    system's light/dark setting from then on. <code>#dark</code> in the address starts it dark.</p>
+
+    <h3>CPU strength</h3>
+    <p><b>Easy</b> kicks around without shooting into its own goal; it is the only level that changes its
+    play from game to game. <b>Normal / Hard / Expert</b> run a real negamax search over the whole game
+    tree — your bounces and theirs are in the tree, which the original Python CPU did not model — with
+    alpha-beta pruning, a transposition table and iterative deepening, and they answer a given position the
+    same way every time. <b>Normal</b> (6 kicks deep) is about the strength the original CPU was aiming for.
+    <b>Hard</b> (12) and <b>Expert</b> (26) search far deeper and take far longer per move; measured
+    head-to-head, though, depth alone does not win more matches, because the position evaluation is a
+    distance-and-open-space proxy — if you want a genuinely tougher CPU, the evaluator is what needs
+    improving, not the search. The status line reports the depth, node count and thinking time of every CPU
+    move, so what each level is doing is visible. Against the deeper levels expect to win by leaving the
+    opponent without a stroke rather than by goals — that is how this game is really decided.</p>
+
+    <h3>What changed compared to <code>football.pyw</code></h3>
+    <ul>
+      <li>The goal-area hatch is <b>visible</b> now (it was drawn and then painted over in white, so players could not see why a kick was blocked or why a bounce happened).</li>
+      <li>The CPU searches with the opponent in the loop (the original scored only its own landing spot by distance to goal, and could walk into its own goal). It never passes when it has a legal kick; being stuck loses, as for a human.</li>
+      <li>Goals count as a match (first to N, alternating kick-offs, pitch keeps the strokes), own goals are an explicit rule with an on/off switch, and there is undo, hints, an event log and a rules panel.</li>
+      <li>Player 1 moved to the number-pad / <code>IOPKL,./</code> cluster, Player 2 to <code>QWE/ASD/ZXC</code>.</li>
+      <li>No external files needed: the ball and the kick sound are drawn/synthesised. If the page is served over http, the original <code>kick (n).wav</code> files are used automatically.</li>
+    </ul>
+    <p class="foot">Everything is in this one file. The rules and the AI live in the
+    <code>engine-src</code> block, which <code>tools/selftest.mjs</code> runs head-less in node
+    (<code>node tools/selftest.mjs</code>) to check legality, termination and what each CPU level really
+    reaches in play.</p>
+  </div>
+</div>
+
+<script id="engine-src">
+/* ===== ENGINE (pure logic: no DOM). Reused by the UI, by the Web Worker and by tools/selftest.mjs ===== */
+(function (g) {
+  'use strict';
+
+  var DIRS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  var MATE = 1000000, MATEC = MATE - 5000;
+  var LEVELS = {
+    easy:   { depth: 1,  budget: 120,  label: 'Easy — casual kicks, never an own goal' },
+    normal: { depth: 6,  budget: 500,  label: 'Normal — like the original CPU, done properly' },
+    hard:   { depth: 12, budget: 1500, label: 'Hard — sees 12 kicks ahead' },
+    expert: { depth: 26, budget: 3500, label: 'Expert — reads 26 kicks deep (slow)' }
+  };
+
+  /* ---------------- board ---------------- */
+  function buildBoard(cfg) {
+    cfg = cfg || {};
+    var cw = Math.max(4, Math.round((cfg.cellCols || 8) / 2) * 2);
+    var ch = Math.max(6, Math.round((cfg.cellRows || 12) / 2) * 2);
+    var W = cw + 1, H = ch + 1, N = W * H;
+    var gc = cw / 2, gr = ch / 2;
+    var goalHalf = Math.max(1, Math.min(cfg.goalHalf == null ? 1 : cfg.goalHalf, gc - 1));
+    var ownGoals = cfg.ownGoals !== false;
+    function idx(c, r) { return r * W + c; }
+
+    var edgeNodes = [], edgeId = new Map();
+    function addEdge(a, b) {
+      var k = a < b ? a * N + b : b * N + a;
+      var got = edgeId.get(k); if (got !== undefined) return got;
+      var e = edgeNodes.length; edgeNodes.push([a, b]); edgeId.set(k, e); return e;
+    }
+    var fwd = [[1, 0], [0, 1], [1, 1], [-1, 1]], c, r, e;
+    for (r = 0; r < H; r++) for (c = 0; c < W; c++) {
+      for (var f = 0; f < 4; f++) {
+        var nc = c + fwd[f][0], nr = r + fwd[f][1];
+        if (nc < 0 || nc >= W || nr < 0 || nr >= H) continue;
+        addEdge(idx(c, r), idx(nc, nr));
+      }
+    }
+    var E = edgeNodes.length;
+    var adjEdge = new Int32Array(N * 8), adjTo = new Int32Array(N * 8);
+    for (e = 0; e < N * 8; e++) { adjEdge[e] = -1; adjTo[e] = -1; }
+    for (r = 0; r < H; r++) for (c = 0; c < W; c++) {
+      for (var k = 0; k < 8; k++) {
+        var tc = c + DIRS[k][0], tr = r + DIRS[k][1];
+        if (tc < 0 || tc >= W || tr < 0 || tr >= H) continue;
+        adjEdge[idx(c, r) * 8 + k] = addEdge(idx(c, r), idx(tc, tr));
+        adjTo[idx(c, r) * 8 + k] = idx(tc, tr);
+      }
+    }
+
+    /* printed pitch — identical to the original football.pyw layout */
+    var pre = [], seen = new Set();
+    function add(c1, r1, c2, r2) {
+      var ee = addEdge(idx(c1, r1), idx(c2, r2));
+      if (!seen.has(ee)) { seen.add(ee); pre.push(ee); }
+    }
+    var cols = [0, W - 1], i;
+    for (i = 0; i < 2; i++) for (r = 1; r <= H - 3; r++) add(cols[i], r, cols[i], r + 1);          /* sidelines, corner edges left open */
+    for (c = 0; c <= W - 2; c++) add(c, gr, c + 1, gr);                                            /* half-way line */
+    var rows = [1, H - 2];
+    for (i = 0; i < 2; i++) for (c = 0; c <= W - 2; c++) {                                        /* goal-area line, open in front of the mouth */
+      if (c >= gc - goalHalf && c < gc + goalHalf) continue;
+      add(c, rows[i], c + 1, rows[i]);
+    }
+    var posts = [gc - goalHalf, gc + goalHalf];
+    for (i = 0; i < 2; i++) { add(posts[i], 0, posts[i], 1); add(posts[i], H - 2, posts[i], H - 1); }
+    for (i = 0; i < 2; i++) {                                                                     /* goal-area hatch, in the end rows of cells */
+      var rr = i === 0 ? 0 : H - 2;
+      for (c = 0; c <= cw - 1; c++) { if (c >= gc - goalHalf && c < gc + goalHalf) continue; add(c, rr, c + 1, rr + 1); add(c + 1, rr, c, rr + 1); }
+      for (c = 0; c <= W - 1; c++) { if (c >= gc - goalHalf && c <= gc + goalHalf) continue; add(c, rr, c, rr + 1); }
+    }
+
+    var goalNodes = [[], []], goalOwner = new Int8Array(N); for (e = 0; e < N; e++) goalOwner[e] = -1;
+    for (c = gc - goalHalf; c <= gc + goalHalf; c++) {
+      goalNodes[0].push(idx(c, 0)); goalOwner[idx(c, 0)] = 0;
+      goalNodes[1].push(idx(c, H - 1)); goalOwner[idx(c, H - 1)] = 1;
+    }
+    var hdist = [new Int32Array(N), new Int32Array(N)];
+    for (var s = 0; s < 2; s++) for (var n = 0; n < N; n++) {
+      var best = 1e9, cc = n % W, rrw = (n / W) | 0;
+      for (i = 0; i < goalNodes[s].length; i++) {
+        var t = goalNodes[s][i], d = Math.abs(cc - (t % W)) + Math.abs(rrw - ((t / W) | 0));
+        if (d < best) best = d;
+      }
+      hdist[s][n] = best;
+    }
+    var preUsed = new Uint8Array(E); for (i = 0; i < pre.length; i++) preUsed[pre[i]] = 1;
+
+    return {
+      cellCols: cw, cellRows: ch, W: W, H: H, N: N, E: E, gc: gc, gr: gr, goalHalf: goalHalf,
+      ownGoals: ownGoals, idx: idx, center: idx(gc, gr), adjEdge: adjEdge, adjTo: adjTo,
+      edgeNodes: edgeNodes, goalNodes: goalNodes, goalOwner: goalOwner, hdist: hdist,
+      preUsed: preUsed, preCount: pre.length, playable: E - pre.length
+    };
+  }
+
+  /* ---------------- state, moves ---------------- */
+  function bumpDeg(board, used, deg, sign) {
+    var en = board.edgeNodes;
+    for (var e = 0; e < board.E; e++) { if (!used[e]) continue; deg[en[e][0]] += sign; deg[en[e][1]] += sign; }
+  }
+  function newState(board, side) {
+    var used = board.preUsed.slice(), deg = new Int32Array(board.N);
+    bumpDeg(board, used, deg, 1);
+    return { used: used, deg: deg, ball: board.center, side: side || 0 };
+  }
+  function stateFrom(board, usedArr, ball, side) {
+    var used = new Uint8Array(board.E);
+    for (var e = 0; e < board.E; e++) used[e] = usedArr[e] ? 1 : 0;
+    var deg = new Int32Array(board.N); bumpDeg(board, used, deg, 1);
+    return { used: used, deg: deg, ball: ball, side: side };
+  }
+  function cloneState(board, ps) {
+    return { used: ps.used.slice(), deg: ps.deg.slice(), ball: ps.ball, side: ps.side };
+  }
+  /* isBounce / isGoal are evaluated against the position BEFORE the stroke is drawn */
+  function legalMoves(board, ps) {
+    var out = [], a = ps.ball, side = ps.side, base = a * 8;
+    for (var k = 0; k < 8; k++) {
+      var e = board.adjEdge[base + k];
+      if (e < 0 || ps.used[e]) continue;
+      var to = board.adjTo[base + k], own = board.goalOwner[to];
+      if (own !== -1 && own !== side && !board.ownGoals) continue;
+      out.push({
+        edge: e, from: a, to: to, dir: k, isBounce: ps.deg[to] > 0,
+        isGoal: own === side, isOwnGoal: own !== -1 && own !== side
+      });
+    }
+    return out;
+  }
+  function makeMove(ps, mv) {
+    ps.used[mv.edge] = 1; ps.deg[mv.from]++; ps.deg[mv.to]++; ps.ball = mv.to;
+    if (!mv.isBounce) ps.side ^= 1;
+  }
+  function unmakeMove(ps, mv) {
+    if (!mv.isBounce) ps.side ^= 1;
+    ps.ball = mv.from; ps.deg[mv.from]--; ps.deg[mv.to]--; ps.used[mv.edge] = 0;
+  }
+
+  /* ---------------- CPU ---------------- */
+  function createCpu(board) {
+    var seed = 2246822251 >>> 0;
+    function rnd32() {
+      seed ^= seed << 13; seed >>>= 0; seed ^= seed >>> 17; seed ^= seed << 5; seed >>>= 0; return seed >>> 0;
+    }
+    var zE1 = new Uint32Array(board.E), zE2 = new Uint32Array(board.E);
+    var zB1 = new Uint32Array(board.N), zB2 = new Uint32Array(board.N);
+    var i;
+    for (i = 0; i < board.E; i++) { zE1[i] = rnd32(); zE2[i] = rnd32(); }
+    for (i = 0; i < board.N; i++) { zB1[i] = rnd32(); zB2[i] = rnd32(); }
+    var zS1 = rnd32(), zS2 = rnd32();
+    var tt = new Map(), TT_MAX = 400000;
+    var dist = new Int32Array(board.N), que = new Int32Array(board.N);
+    var h1 = 0, h2 = 0, ctx = null, nodes = 0;
+    var ABORT = { abort: true };
+
+    function hashAll(ps) {
+      h1 = ps.side ? zS1 : 0; h2 = ps.side ? zS2 : 0;
+      for (var e = 0; e < board.E; e++) if (ps.used[e]) { h1 ^= zE1[e]; h2 ^= zE2[e]; }
+      h1 ^= zB1[ps.ball]; h2 ^= zB2[ps.ball];
+    }
+    function rehashOn(mv, flip) {
+      h1 ^= zE1[mv.edge]; h1 ^= zB1[mv.from]; h1 ^= zB1[mv.to]; if (flip) h1 ^= zS1;
+      h2 ^= zE2[mv.edge]; h2 ^= zB2[mv.from]; h2 ^= zB2[mv.to]; if (flip) h2 ^= zS2;
+    }
+
+    /* how many kicks along still-blank strokes to each goal, from where the ball is */
+    function evaluate(ps) {
+      var side = ps.side, used = ps.used, n, k, e, t;
+      for (n = 0; n < board.N; n++) dist[n] = -1;
+      var head = 0, tail = 0;
+      dist[ps.ball] = 0; que[tail++] = ps.ball;
+      while (head < tail) {
+        n = que[head++]; var d0 = dist[n], base = n * 8;
+        for (k = 0; k < 8; k++) {
+          e = board.adjEdge[base + k]; if (e < 0 || used[e]) continue;
+          t = board.adjTo[base + k]; if (dist[t] >= 0) continue;
+          dist[t] = d0 + 1; que[tail++] = t;
+        }
+      }
+      var mine = 40, his = 40, gn = board.goalNodes[side], gn2 = board.goalNodes[side ^ 1];
+      for (var a = 0; a < gn.length; a++) { var v = dist[gn[a]]; if (v >= 0 && v < mine) mine = v; }
+      for (a = 0; a < gn2.length; a++) { var v2 = dist[gn2[a]]; if (v2 >= 0 && v2 < his) his = v2; }
+      var mob = 0, base2 = ps.ball * 8;
+      for (k = 0; k < 8; k++) { var ee = board.adjEdge[base2 + k]; if (ee >= 0 && !used[ee]) mob++; }
+      var sc = 42 * (his - mine) + 7 * mob;
+      return sc > 900000 ? 900000 : (sc < -900000 ? -900000 : sc);
+    }
+
+    function orderScore(mv, side) {
+      return (mv.isGoal ? 1000000 : 0) + (mv.isOwnGoal ? -200000 : 0) + (mv.isBounce ? 4000 : 0)
+        + (board.hdist[side][mv.from] - board.hdist[side][mv.to]) * 25;
+    }
+
+    function search(ps, depth, alpha, beta, ply) {
+      if (((++nodes) & 1023) === 0 && Date.now() > ctx.deadline) throw ABORT;
+      var moves = legalMoves(board, ps);
+      if (!moves.length) return -MATE + ply;                 /* the player to kick has no stroke left */
+      if (depth <= 0) return evaluate(ps);
+
+      var key1 = h1, ent = tt.get(key1), ttMove = -1, alphaOrig = alpha, v;
+      if (ent !== undefined && ent.h2 === h2) {
+        ttMove = ent.move;
+        if (ent.depth >= depth) {
+          v = ent.value;
+          if (v >= MATEC) v -= ply; else if (v <= -MATEC) v += ply;
+          if (ent.flag === 0) return v;
+          if (ent.flag === 1) { if (v > alpha) alpha = v; } else { if (v < beta) beta = v; }
+          if (alpha >= beta) return v;
+        }
+      }
+      var side = ps.side, m, mv, flip, val, owner, best = -Infinity, bestMove = -1;
+      if (ttMove >= 0) {
+        for (m = 0; m < moves.length; m++) if (moves[m].edge === ttMove) { var tmp = moves[m]; moves.splice(m, 1); moves.unshift(tmp); break; }
+      } else {
+        moves.sort(function (a, b) { return orderScore(b, side) - orderScore(a, side); });
+      }
+      for (m = 0; m < moves.length; m++) {
+        mv = moves[m]; flip = mv.isBounce ? 0 : 1;
+        makeMove(ps, mv); rehashOn(mv, flip);
+        try {
+          owner = board.goalOwner[mv.to];
+          /* a bounce means the same player kicks again, so that child is not negated
+             and its window is not mirrored — the tree does not strictly alternate */
+          if (owner !== -1) val = (owner === side) ? (MATE - ply - 1) : (-MATE + ply + 1);
+          else if (mv.isBounce) val = search(ps, depth - 1, alpha, beta, ply + 1);
+          else val = -search(ps, depth - 1, -beta, -alpha, ply + 1);
+        } finally {
+          /* a time-out aborts the tree: the position must still be rewound */
+          unmakeMove(ps, mv); rehashOn(mv, flip);
+        }
+        if (val > best) { best = val; bestMove = mv.edge; }
+        if (val > alpha) alpha = val;
+        if (alpha >= beta) break;
+      }
+      if (tt.size < TT_MAX) {
+        var sv = best;
+        if (sv >= MATEC) sv += ply; else if (sv <= -MATEC) sv -= ply;
+        tt.set(key1, { h2: h2, depth: depth, value: sv, move: bestMove, flag: best <= alphaOrig ? 2 : (best >= beta ? 1 : 0) });
+      }
+      return best;
+    }
+
+    function easyPick(moves, ps) {
+      var pool = [], i, mv, dead;
+      for (i = 0; i < moves.length; i++) {
+        mv = moves[i];
+        if (mv.isOwnGoal) continue;
+        if (mv.isBounce) {
+          makeMove(ps, mv); dead = legalMoves(board, ps).length === 0; unmakeMove(ps, mv);
+          if (dead) continue;
+        }
+        pool.push(mv);
+      }
+      if (!pool.length) pool = moves;
+      var wins = pool.filter(function (m) { return m.isGoal; });
+      var p = wins.length ? wins : pool;
+      return p[(Math.random() * p.length) | 0];
+    }
+
+    function choose(level, ps, budgetOverride) {
+      var lv = LEVELS[level] || LEVELS.normal;
+      var moves = legalMoves(board, ps);
+      if (!moves.length) return null;
+      if (level === 'easy') { var ep = easyPick(moves, ps); return ep; }
+
+      var budget = Math.max(60, budgetOverride || lv.budget);
+      var rootSide = ps.side, t0 = Date.now();
+      ctx = { deadline: t0 + budget }; nodes = 0;
+      hashAll(ps);
+
+      var scores = new Map(), best = moves[0], bestScore = -Infinity, done = 0, d;
+      for (d = 1; d <= lv.depth; d++) {
+        var ordered = moves.slice();
+        if (scores.size) ordered.sort(function (a, b) { return (scores.get(b.edge) || -Infinity) - (scores.get(a.edge) || -Infinity); });
+        var entR = tt.get(h1);
+        if (entR && entR.h2 === h2 && entR.move >= 0) {
+          for (var q = 0; q < ordered.length; q++) if (ordered[q].edge === entR.move) { var tp = ordered[q]; ordered.splice(q, 1); ordered.unshift(tp); break; }
+        }
+        var alpha = -Infinity, localBest = null, local = new Map();
+        try {
+          for (var m2 = 0; m2 < ordered.length; m2++) {
+            var mv2 = ordered[m2];
+            makeMove(ps, mv2); rehashOn(mv2, mv2.isBounce ? 0 : 1);
+            try {
+              var own = board.goalOwner[mv2.to], val2;
+              if (own !== -1) val2 = (own === rootSide) ? (MATE - 1) : (-MATE + 1);
+              else if (mv2.isBounce) val2 = search(ps, d - 1, alpha, Infinity, 1);
+              else val2 = -search(ps, d - 1, -Infinity, -alpha, 1);
+            } finally {
+              unmakeMove(ps, mv2); rehashOn(mv2, mv2.isBounce ? 0 : 1);
+            }
+            local.set(mv2.edge, val2);
+            if (val2 > alpha) { alpha = val2; localBest = mv2; }
+          }
+          local.forEach(function (vv, kk) { scores.set(kk, vv); });
+          if (localBest) { best = localBest; bestScore = alpha; done = d; }
+        } catch (err) { if (err !== ABORT) throw err; break; }
+        if (Math.abs(bestScore) >= MATEC) break;
+        if (Date.now() > ctx.deadline) break;
+      }
+
+      /* Several moves can score exactly the same. Do not choose one of them at random:
+         keep the order the search already put them in — goal first, then avoiding own
+         goals, then keeping the bounce tempo — so a given position is always answered the
+         same way. Randomising is left to 'easy' on purpose (see easyPick). */
+      var pick = best;
+      for (var i2 = 0; i2 < ordered.length; i2++) {
+        if (scores.get(ordered[i2].edge) === bestScore) { pick = ordered[i2]; break; }
+      }
+      return {
+        edge: pick.edge, from: pick.from, to: pick.to, dir: pick.dir, isBounce: pick.isBounce,
+        isGoal: pick.isGoal, isOwnGoal: pick.isOwnGoal,
+        score: bestScore, depth: done, nodes: nodes, ms: Date.now() - t0
+      };
+    }
+
+    return {
+      choose: choose,
+      clearCache: function () { tt.clear(); },
+      stats: function () { return { tt: tt.size }; }
+    };
+  }
+
+  var sessions = new Map();
+  function session(cfg) {
+    var key = [cfg.cellCols, cfg.cellRows, cfg.goalHalf | 0, cfg.ownGoals ? 1 : 0].join('|');
+    var s = sessions.get(key);
+    if (!s) { var board = buildBoard(cfg); s = { board: board, cpu: createCpu(board) }; sessions.set(key, s); }
+    return s;
+  }
+
+  /* ---------------- match: goals, kick-offs, undo ---------------- */
+  function createMatch(cfg) {
+    var s = session(cfg);
+    var M = {
+      cfg: cfg, board: s.board, cpu: s.cpu, ps: null, scores: [0, 0],
+      firstTo: cfg.firstTo | 0, over: false, winner: null, reason: '', hist: [],
+
+      reset: function () {
+        this.ps = newState(this.board, 0); this.scores = [0, 0];
+        this.over = false; this.winner = null; this.reason = ''; this.hist = [];
+      },
+      moves: function () { return legalMoves(this.board, this.ps); },
+      pick: function (dir) {
+        var ms = this.moves();
+        for (var i = 0; i < ms.length; i++) if (ms[i].dir === dir) return ms[i];
+        return null;
+      },
+
+      play: function (mv) {
+        if (this.over || !mv) return null;
+        var board = this.board, ps = this.ps, legal = legalMoves(board, ps), found = null;
+        for (var i = 0; i < legal.length; i++) if (legal[i].edge === mv.edge) { found = legal[i]; break; }
+        if (!found) return null;
+
+        var rec = {
+          kind: 'move', mv: found, side: ps.side, scores: this.scores.slice(),
+          over: this.over, winner: this.winner, reason: this.reason, kickoff: null
+        };
+        var evt = { kind: 'kick', side: rec.side, from: found.from, to: found.to, bounce: found.isBounce, goal: false, ownGoal: false, stuck: false };
+        makeMove(ps, found);
+
+        var owner = board.goalOwner[found.to];
+        if (owner !== -1) {
+          evt.goal = true; evt.scorer = owner; evt.ownGoal = (owner !== rec.side);
+          this.scores[owner]++;
+          if (this.firstTo > 0 && this.scores[owner] >= this.firstTo) {
+            this.over = true; this.winner = owner; this.reason = evt.ownGoal ? 'own goal' : 'goals';
+          } else {
+            rec.kickoff = { ball: ps.ball, side: ps.side };
+            ps.ball = board.center; ps.side = owner ^ 1;
+            if (legalMoves(board, ps).length === 0) {
+              this.over = true; this.winner = (owner ^ 1) ^ 1; this.reason = 'no strokes left'; evt.stuck = true;
+            }
+            this.hist.push(rec);
+            return evt;
+          }
+        }
+        if (!this.over && legalMoves(board, ps).length === 0) {
+          this.over = true; this.winner = ps.side ^ 1; this.reason = 'no strokes left'; evt.stuck = true;
+        }
+        this.hist.push(rec);
+        return evt;
+      },
+
+      undo: function () {
+        if (!this.hist.length) return false;
+        var rec = this.hist.pop(), ps = this.ps;
+        if (rec.kickoff) { ps.ball = rec.kickoff.ball; ps.side = rec.kickoff.side; }
+        unmakeMove(ps, rec.mv);
+        ps.side = rec.side;
+        this.scores = rec.scores; this.over = rec.over; this.winner = rec.winner; this.reason = rec.reason;
+        return true;
+      },
+
+      strokes: function () {
+        var out = [];
+        for (var i = 0; i < this.hist.length; i++) {
+          var r = this.hist[i]; if (r.kind !== 'move') continue;
+          out.push({ from: r.mv.from, to: r.mv.to, side: r.side, edge: r.mv.edge });
+        }
+        return out;
+      }
+    };
+    M.reset();
+    return M;
+  }
+
+  g.FBEngine = {
+    DIRS: DIRS, MATE: MATE, LEVELS: LEVELS, buildBoard: buildBoard, session: session,
+    createMatch: createMatch, newState: newState, stateFrom: stateFrom, cloneState: cloneState,
+    legalMoves: legalMoves, makeMove: makeMove, unmakeMove: unmakeMove
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+/* ===== ENGINE END ===== */
+</script>
+
+<script id="app-src">
+/* ===== APP: paper rendering, input, match controller ===== */
+(function () {
+  'use strict';
+  var ENG = window.FBEngine;
+  function $(id) { return document.getElementById(id); }
+
+  /* ---------- config ---------- */
+  var cfg = {
+    cellCols: 8, cellRows: 12, goalHalf: 1, ownGoals: true, firstTo: 3,
+    mode: 'youP1', level: 'normal', sound: true, hints: true, theme: 'light'
+  };
+  (function loadPrefs() {
+    try {
+      var raw = localStorage.getItem('paperfootball.cfg');
+      if (raw) { var p = JSON.parse(raw); for (var k in p) if (cfg.hasOwnProperty(k)) cfg[k] = p[k]; }
+    } catch (e) {}
+  })();
+  /* index.html#demo starts a CPU vs CPU game you can watch; #level=hard|expert|easy|normal
+     picks the strength for this opening; #dark (or #theme=dark / #theme=light) picks the paper.
+     None of them is written back to the saved settings. */
+  try {
+    var startHash = String((window.location && window.location.hash) || '').toLowerCase();
+    if (startHash.indexOf('demo') >= 0) cfg.mode = 'demo';
+    var lv = /level=(easy|normal|hard|expert)/.exec(startHash);
+    if (lv) cfg.level = lv[1];
+    if (startHash.indexOf('dark') >= 0) cfg.theme = 'dark';
+    var th = /theme=(light|dark|auto)/.exec(startHash);
+    if (th) cfg.theme = th[1];
+  } catch (e) {}
+  function savePrefs() { try { localStorage.setItem('paperfootball.cfg', JSON.stringify(cfg)); } catch (e) {} }
+  /* Paper: 'light' is the shipped look (blue-black ballpoint on graph paper), 'dark' is the same
+     game in white and pale-blue pencil on dark paper, 'auto' follows the system. The default is
+     light on purpose — the paper-and-pen look is the point of this thing. */
+  function systemDark() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+    catch (e) { return false; }
+  }
+  function themeWanted() {
+    return cfg.theme === 'dark' || (cfg.theme !== 'light' && systemDark());
+  }
+  function themeChoice() {
+    return ['light', 'dark', 'auto'].indexOf(cfg.theme) >= 0 ? cfg.theme : 'light';
+  }
+
+  var BOARD_PRESETS = { '6,10': [6, 10], '8,12': [8, 12], '10,16': [10, 16] };
+
+  /* ---------- key bindings: P1 = numpad / I O P K L , . /  (or arrows), P2 = Q W E A S D Z X C ---------- */
+  var PAD = [
+    { dir: 0, p1: [['Numpad7', 'num 7'], ['KeyI', 'I']], p2: [['KeyQ', 'Q']] },
+    { dir: 1, p1: [['Numpad8', 'num 8'], ['KeyO', 'O'], ['ArrowUp', '↑']], p2: [['KeyW', 'W']] },
+    { dir: 2, p1: [['Numpad9', 'num 9'], ['KeyP', 'P']], p2: [['KeyE', 'E']] },
+    { dir: 3, p1: [['Numpad4', 'num 4'], ['KeyK', 'K'], ['ArrowLeft', '←']], p2: [['KeyA', 'A']] },
+    { dir: 4, p1: [['Numpad6', 'num 6'], ['KeyL', 'L'], ['Semicolon', ';'], ['ArrowRight', '→']], p2: [['KeyD', 'D']] },
+    { dir: 5, p1: [['Numpad1', 'num 1'], ['KeyComma', ',']], p2: [['KeyZ', 'Z']] },
+    { dir: 6, p1: [['Numpad2', 'num 2'], ['KeyPeriod', '.'], ['ArrowDown', '↓']], p2: [['KeyX', 'X']] },
+    { dir: 7, p1: [['Numpad3', 'num 3'], ['KeySlash', '/']], p2: [['KeyC', 'C']] }
+  ];
+  var CODE2DIR = [{}, {}];
+  PAD.forEach(function (p) {
+    p.p1.forEach(function (b) { CODE2DIR[0][b[0]] = p.dir; });
+    p.p2.forEach(function (b) { CODE2DIR[1][b[0]] = p.dir; });
+  });
+
+  /* ---------- state ---------- */
+  var match = null, board = null, cpu = null;
+  var phase = 'wait';               /* wait | think | anim | over */
+  var anim = null, flash = null, hint = null, toast = null, hoverNode = -1;
+  var strokes = [], lastAiInfo = '';
+  var logLines = [];
+
+  function isHuman(side) {
+    if (cfg.mode === '2p') return true;
+    if (cfg.mode === 'demo') return false;
+    return (cfg.mode === 'youP1') ? side === 0 : side === 1;
+  }
+  function nameOf(side) { return isHuman(side) ? (side === 0 ? 'Player 1' : 'Player 2') : 'CPU'; }
+  function colorOf(side) { return side === 0 ? T.p1 : T.p2; }
+  /* The sheet is hand-drawn on a canvas, so its palette is spelled out here too (the CSS
+     variables cover the panels around it). Light is ballpoint on graph paper; dark is a white
+     and a pale-blue pencil on dark paper. applyTheme() swaps the palette and repaints. */
+  var THEMES = {
+    light: { field:'#eef0fa', grid:'rgba(160,200,230,.72)', dots:'rgba(30,0,130,.16)', fibre:'rgba(30,0,130,',
+             ink:'#1e0082', p1:'#000000', p2:'#0000c8', warn:'#c01414',
+             toast:'rgba(30,0,130,.75)', veil:'rgba(238,240,250,.72)', shadow:'rgba(30,0,130,0.14)' },
+    dark:  { field:'#171a20', grid:'rgba(130,158,196,.34)', dots:'rgba(214,224,242,.20)', fibre:'rgba(255,255,255,',
+             ink:'#e9edf6', p1:'#f4f6fa', p2:'#7fb0ff', warn:'#ff8080',
+             toast:'rgba(226,233,246,.85)', veil:'rgba(21,23,29,.78)', shadow:'rgba(0,0,0,.45)' }
+  };
+  var T = THEMES.light;
+  /* Paint the theme before anything is drawn: the page grid and the canvas sheet have to change
+     together, so there is never a moment of half-light on load or when the theme is switched. */
+  function applyTheme() {
+    var dark = themeWanted();
+    T = dark ? THEMES.dark : THEMES.light;
+    try { document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light'); } catch (e) {}
+    var sel = $('selTheme');
+    if (sel) { try { sel.value = themeChoice(); } catch (e) {} }
+    /* the sheet is a cached bitmap — repaint it, then re-lock the page grid to its grid */
+    if (board && cwpx) { buildPaper(); syncPageGrid(); }
+  }
+  applyTheme();
+  try {
+    var mqDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    if (mqDark && mqDark.addEventListener) {
+      mqDark.addEventListener('change', function () { if (!cfg.theme) applyTheme(); });
+    }
+  } catch (e) {}
+
+  /* ---------- canvas layout ---------- */
+  var canvas = $('field'), ctx = canvas.getContext('2d');
+  var paper = document.createElement('canvas'), pctx = paper.getContext('2d');
+  var wrap = $('boardwrap');
+  var cell = 40, ox = 0, oy = 0, dpr = 1, cwpx = 0, chpx = 0, margin = 1.15;
+
+  function layout() {
+    dpr = Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+    var cw = board.cellCols, ch = board.cellRows;
+    /* The board box is the honest bound, but during first paint it can report a stale,
+       content-sized value — the viewport cannot lie, so take the smaller of the two:
+       never overflow the board area, never shrink because the flex layout has not settled. */
+    var reserve = Math.min(360, Math.round((window.innerWidth || 1200) * 0.42));
+    var availW = Math.min(Math.max(240, wrap.clientWidth - 16), Math.max(240, (window.innerWidth || 1200) - reserve));
+    var availH = Math.min(Math.max(240, wrap.clientHeight - 16), Math.max(240, (window.innerHeight || 800) - 150));
+    /* the sheet of paper fills the board area; the pitch is drawn centred on it */
+    cwpx = Math.round(availW); chpx = Math.round(availH);
+    cell = Math.floor(Math.min(cwpx / (cw + 2 * margin), chpx / (ch + 2 * margin)));
+    cell = Math.max(16, cell);
+    canvas.style.width = cwpx + 'px'; canvas.style.height = chpx + 'px';
+    canvas.width = Math.round(cwpx * dpr); canvas.height = Math.round(chpx * dpr);
+    paper.width = canvas.width; paper.height = canvas.height;
+    ox = Math.round((cwpx - cw * cell) / 2); oy = Math.round((chpx - ch * cell) / 2);
+    lastAw = wrap.clientWidth; lastAh = wrap.clientHeight;
+    buildPaper();
+    syncPageGrid();
+  }
+  /* the paper on the page behind the panels is the same sheet, not a second grid */
+  function syncPageGrid() {
+    if (!document.documentElement || !document.documentElement.style) return;
+    var root = document.documentElement.style;
+    root.setProperty('--gs', cell + 'px');
+    var r = canvas.getBoundingClientRect();
+    root.setProperty('--gx', Math.round(r.left + ox) + 'px');
+    root.setProperty('--gy', Math.round(r.top + oy) + 'px');
+  }
+  /* The very first layout() runs before the browser has settled the page box, and the
+     window can be resized or the sidebar wrapped afterwards — re-measure, but only when
+     the board area really changed size, so the paper is never rebuilt on every event. */
+  var lastAw = -1, lastAh = -1, relayoutPending = false;
+  function relayout() {
+    if (relayoutPending) return;
+    relayoutPending = true;
+    requestAnimationFrame(function () {
+      relayoutPending = false;
+      if (!board) return;
+      var aw = wrap.clientWidth, ah = wrap.clientHeight;
+      if (Math.abs(aw - lastAw) > 4 || Math.abs(ah - lastAh) > 4) layout();
+    });
+  }
+  function nx(node) { return ox + (node % board.W) * cell; }
+  function ny(node) { return oy + ((node / board.W) | 0) * cell; }
+  function nodeAt(x, y) {
+    var c = Math.round((x - ox) / cell), r = Math.round((y - oy) / cell);
+    if (c < 0 || c >= board.W || r < 0 || r >= board.H) return -1;
+    var n = r * board.W + c;
+    if (Math.abs(x - nx(n)) > cell * 0.44 || Math.abs(y - ny(n)) > cell * 0.44) return -1;
+    return n;
+  }
+
+  /* ---------- hand-drawn primitives ---------- */
+  function pr(seed) { var x = Math.sin(seed * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+  function ctrl(x1, y1, x2, y2, seed) {
+    var dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var px = -dy / len, py = dx / len, wob = Math.min(1.8, len * 0.055);
+    var o1 = (pr(seed) * 2 - 1) * wob, o2 = (pr(seed + 7.3) * 2 - 1) * wob;
+    return [x1 + dx * 0.3 + px * o1, y1 + dy * 0.3 + py * o1, x1 + dx * 0.7 + px * o2, y1 + dy * 0.7 + py * o2];
+  }
+  function pen(c, x1, y1, x2, y2, seed, color, w, alpha, tEnd) {
+    var cc = ctrl(x1, y1, x2, y2, seed);
+    c.beginPath(); c.moveTo(x1, y1);
+    if (tEnd == null || tEnd >= 1) {
+      c.bezierCurveTo(cc[0], cc[1], cc[2], cc[3], x2, y2);
+    } else {
+      for (var i = 1; i <= 16; i++) {
+        var t = (i / 16) * tEnd, m = 1 - t;
+        c.lineTo(m * m * m * x1 + 3 * m * m * t * cc[0] + 3 * m * t * t * cc[2] + t * t * t * x2,
+                 m * m * m * y1 + 3 * m * m * t * cc[1] + 3 * m * t * t * cc[3] + t * t * t * y2);
+      }
+    }
+    c.globalAlpha = alpha == null ? 1 : alpha; c.strokeStyle = color; c.lineWidth = w; c.lineCap = 'round';
+    c.stroke(); c.globalAlpha = 1;
+  }
+  /* The players' pencil strokes are deliberately lighter than the printed pitch: a real
+     pencil line over pre-printed graph paper is thinner than the print, not heavier. */
+  function strokeW() { return Math.max(1.0, cell * 0.034); }
+  function ink(c, x1, y1, x2, y2, seed, color, w, tEnd) {
+    pen(c, x1, y1, x2, y2, seed, color, w * 1.8, 0.07, tEnd);
+    pen(c, x1, y1, x2, y2, seed, color, w, 0.88, tEnd);
+    pen(c, x1, y1, x2, y2, seed + 3.7, color, w * 0.5, 0.30, tEnd);
+  }
+  function drawBall(c, x, y, r, seed) {
+    c.save(); c.translate(x, y);
+    c.fillStyle = T.shadow;
+    c.beginPath(); c.ellipse(0, r * 0.30, r * 1.05, r * 0.42, 0, 0, Math.PI * 2); c.fill();
+    var i, a, rr, N = 18;
+    c.beginPath();
+    for (i = 0; i <= N; i++) {
+      a = (i / N) * Math.PI * 2; rr = r * (1 + 0.04 * (pr(seed + i) * 2 - 1));
+      if (i) c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    c.closePath(); c.fillStyle = '#fdfdf5'; c.fill();
+    c.strokeStyle = '#1b1b2a'; c.lineWidth = Math.max(1, r * 0.10); c.stroke();
+    c.beginPath();
+    for (i = 0; i < 5; i++) {
+      a = -Math.PI / 2 + i * Math.PI * 2 / 5;
+      if (i) c.lineTo(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42); else c.moveTo(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42);
+    }
+    c.closePath(); c.fillStyle = '#24243a'; c.fill();
+    c.strokeStyle = 'rgba(36,36,58,.7)'; c.lineWidth = Math.max(0.7, r * 0.06);
+    for (i = 0; i < 5; i++) {
+      a = -Math.PI / 2 + i * Math.PI * 2 / 5;
+      c.beginPath(); c.moveTo(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42); c.lineTo(Math.cos(a) * r * 0.88, Math.sin(a) * r * 0.88); c.stroke();
+    }
+    c.restore();
+  }
+
+  /* ---------- the printed pitch (static layer) ---------- */
+  function edgeKind(e) {
+    var en = board.edgeNodes[e];
+    var a = en[0], b = en[1];
+    var c1 = a % board.W, r1 = (a / board.W) | 0, c2 = b % board.W, r2 = (b / board.W) | 0;
+    var inTop = r1 <= 1 && r2 <= 1, inBot = r1 >= board.H - 2 && r2 >= board.H - 2;
+    if (inTop || inBot) {
+      if (c1 === c2) return (c1 === board.gc - board.goalHalf || c1 === board.gc + board.goalHalf) ? 'main' : 'hatch';
+      if (r1 === r2) return 'main';
+      return 'hatch';
+    }
+    return 'main';
+  }
+  function buildPaper() {
+    var c = pctx, i, n;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cwpx, chpx);
+    c.fillStyle = T.field; c.fillRect(0, 0, cwpx, chpx);
+    /* paper fibre */
+    for (i = 0; i < 1100; i++) {
+      var x = pr(i * 3.7) * cwpx, y = pr(i * 7.1 + 5) * chpx;
+      c.fillStyle = T.fibre + (0.012 + pr(i * 1.3) * 0.022) + ')';
+      c.fillRect(x, y, 1, 1);
+    }
+    /* graph paper grid, aligned with the lattice and covering the whole sheet, so the
+       page background outside the canvas can be made to continue it seamlessly */
+    c.strokeStyle = T.grid; c.lineWidth = 1;
+    c.beginPath();
+    for (var col = Math.ceil(-ox / cell); col <= Math.floor((cwpx - ox) / cell); col++) {
+      var gx = ox + col * cell; c.moveTo(gx + 0.5, 0); c.lineTo(gx + 0.5, chpx);
+    }
+    for (var row = Math.ceil(-oy / cell); row <= Math.floor((chpx - oy) / cell); row++) {
+      var gy = oy + row * cell; c.moveTo(0, gy + 0.5); c.lineTo(cwpx, gy + 0.5);
+    }
+    c.stroke();
+    /* node dots */
+    c.fillStyle = T.dots;
+    for (n = 0; n < board.N; n++) { c.beginPath(); c.arc(nx(n), ny(n), Math.max(1.1, cell * 0.045), 0, Math.PI * 2); c.fill(); }
+
+    /* goals. The two short lines at the posts are printed pitch lines; the net belongs
+       between them — inside the goal frame, not hanging out of it — and the ball enters
+       through the gap in the goal line. */
+    for (var side = 0; side < 2; side++) {
+      var nodes = board.goalNodes[side], colr = colorOf(side);
+      var x1 = nx(nodes[0]), x2 = nx(nodes[nodes.length - 1]);
+      var postY = side === 0 ? oy : ny((board.H - 1) * board.W);            /* back of the goal */
+      var lineY = side === 0 ? ny(board.W) : ny((board.H - 2) * board.W);   /* the goal line   */
+      c.fillStyle = colr; c.globalAlpha = 0.07;
+      c.fillRect(x1, Math.min(postY, lineY), x2 - x1, Math.abs(lineY - postY)); c.globalAlpha = 1;
+      c.strokeStyle = colr; c.globalAlpha = 0.5; c.lineWidth = 1;
+      c.beginPath();
+      for (var s = 1; s < 7; s++) { var gx2 = x1 + (x2 - x1) * s / 7; c.moveTo(gx2, postY); c.lineTo(gx2, lineY); }
+      c.moveTo(x1, postY); c.lineTo(x2, postY); c.stroke(); c.globalAlpha = 1;
+      c.fillStyle = colr;
+      c.font = 'italic ' + Math.round(cell * 0.34) + 'px Georgia, serif';
+      c.textAlign = 'center'; c.textBaseline = side === 0 ? 'bottom' : 'top';
+      var labelY = side === 0 ? postY - cell * 0.45 : postY + cell * 0.45;
+      c.fillText(side === 0 ? 'P1 attacks this goal' : 'P2 attacks this goal', (x1 + x2) / 2, labelY);
+    }
+
+    /* printed pitch lines */
+    for (i = 0; i < board.E; i++) {
+      if (!board.preUsed[i]) continue;
+      var en = board.edgeNodes[i];
+      var x11 = nx(en[0]), y11 = ny(en[0]), x22 = nx(en[1]), y22 = ny(en[1]);
+      if (edgeKind(i) === 'hatch') pen(c, x11, y11, x22, y22, i * 1.7 + 0.3, T.ink, Math.max(0.8, cell * 0.022), 0.42);
+      else pen(c, x11, y11, x22, y22, i * 1.7 + 0.3, T.ink, Math.max(1.6, cell * 0.055), 0.92);
+    }
+  }
+
+  /* ---------- dynamic layer ---------- */
+  /* Everything animated is measured against the render clock — the timestamp requestAnimationFrame
+     hands us — never against performance.now(). The timestamp of the *next* frame is earlier than
+     performance.now() read inside the current one, and a throttled tab, a long CPU search or a
+     headless run pulls the two clocks further apart; mixing them makes an eased stroke overshoot
+     backwards past the ball. */
+  var lastTs = performance.now();
+  function frame(ts) {
+    if (typeof ts !== 'number' || !(ts >= 0)) ts = performance.now();
+    lastTs = ts;
+    if (anim && ts - anim.t0 >= anim.dur) {
+      anim = null;
+      afterStroke();
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(paper, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var i, st, sw = strokeW();
+    for (i = 0; i < strokes.length; i++) {
+      st = strokes[i];
+      var isLast = i === strokes.length - 1;
+      if (anim && isLast) {
+        var t = Math.min(1, (ts - anim.t0) / anim.dur);
+        var e = 1 - Math.pow(1 - t, 2.2);
+        ink(ctx, nx(st.from), ny(st.from), nx(st.to), ny(st.to), st.edge * 2.3 + 11, colorOf(st.side), sw, e);
+      } else {
+        ink(ctx, nx(st.from), ny(st.from), nx(st.to), ny(st.to), st.edge * 2.3 + 11, colorOf(st.side), sw);
+      }
+    }
+
+    /* ball position (interpolated while a stroke is being drawn) */
+    var bx = nx(match.ps.ball), by = ny(match.ps.ball);
+    if (anim) {
+      var t2 = Math.min(1, (ts - anim.t0) / anim.dur), e2 = 1 - Math.pow(1 - t2, 2.2);
+      bx = nx(anim.mv.from) + (nx(anim.mv.to) - nx(anim.mv.from)) * e2;
+      by = ny(anim.mv.from) + (ny(anim.mv.to) - ny(anim.mv.from)) * e2;
+    }
+
+    /* legal-move dots and hover preview for the human to move */
+    if (cfg.hints && phase === 'wait') {
+      var ms = match.moves(), col = colorOf(match.ps.side);
+      ctx.save();
+      for (i = 0; i < ms.length; i++) {
+        var mv = ms[i];
+        ctx.beginPath(); ctx.arc(nx(mv.to), ny(mv.to), Math.max(2.4, cell * 0.10), 0, Math.PI * 2);
+        ctx.strokeStyle = col; ctx.globalAlpha = hoverNode === mv.to ? 0.95 : 0.42; ctx.lineWidth = 1.6; ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      if (hoverNode >= 0) {
+        for (i = 0; i < ms.length; i++) if (ms[i].to === hoverNode) {
+          ctx.setLineDash([4, 4]);
+          pen(ctx, bx, by, nx(hoverNode), ny(hoverNode), 99, col, 2.2, 0.8);
+          ctx.setLineDash([]);
+          if (ms[i].isBounce) {
+            ctx.fillStyle = T.warn; ctx.font = 'bold ' + Math.round(cell * 0.3) + 'px Georgia, serif';
+            ctx.textAlign = 'center'; ctx.fillText('bounce!', (bx + nx(hoverNode)) / 2, (by + ny(hoverNode)) / 2 - cell * 0.18);
+          }
+          if (ms[i].isGoal) {
+            ctx.fillStyle = col; ctx.font = 'bold ' + Math.round(cell * 0.3) + 'px Georgia, serif';
+            ctx.textAlign = 'center'; ctx.fillText('GOAL', (bx + nx(hoverNode)) / 2, (by + ny(hoverNode)) / 2 - cell * 0.18);
+          }
+          break;
+        }
+      }
+      ctx.restore();
+    }
+    if (hint) {
+      ctx.save(); ctx.setLineDash([6, 5]); ctx.globalAlpha = 0.85;
+      pen(ctx, nx(hint.from), ny(hint.from), nx(hint.to), ny(hint.to), 55, T.warn, 2.2, 0.9);
+      ctx.setLineDash([]); ctx.restore();
+      if (lastTs > hint.until) hint = null;
+    }
+
+    /* turn ring */
+    if (!match.over && phase !== 'anim') {
+      var pulse = 0.5 + 0.5 * Math.sin(ts / 260);
+      ctx.strokeStyle = colorOf(match.ps.side); ctx.globalAlpha = 0.25 + 0.35 * pulse;
+      ctx.lineWidth = 2; ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.arc(bx, by, cell * 0.52 + pulse * 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+
+    drawBall(ctx, bx, by, cell * 0.30, 7);
+
+    /* bounce flash */
+    if (flash && lastTs < flash.until) {
+      ctx.fillStyle = T.warn; ctx.globalAlpha = 0.85;
+      ctx.font = 'italic ' + Math.round(cell * 0.42) + 'px Georgia, serif'; ctx.textAlign = 'center';
+      ctx.fillText('bounce — kick again!', bx, by - cell * 0.95);
+      ctx.globalAlpha = 1;
+    } else if (flash) flash = null;
+
+    if (toast && lastTs < toast.until) {
+      ctx.fillStyle = toast.color; ctx.globalAlpha = 0.9;
+      ctx.font = 'italic ' + Math.round(cell * 0.4) + 'px Georgia, serif'; ctx.textAlign = 'center';
+      ctx.fillText(toast.text, cwpx / 2, oy - cell * 0.35);
+      ctx.globalAlpha = 1;
+    } else if (toast) toast = null;
+
+    if (match.over) {
+      ctx.fillStyle = T.veil; ctx.fillRect(0, 0, cwpx, chpx);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = T.warn;
+      ctx.font = 'bold ' + Math.round(cell * 1.05) + 'px Cambria, Georgia, serif';
+      ctx.fillText(nameOf(match.winner) + ' won!', cwpx / 2, chpx / 2 - cell * 0.2);
+      ctx.fillStyle = T.ink; ctx.font = 'italic ' + Math.round(cell * 0.42) + 'px Georgia, serif';
+      ctx.fillText(explainEnd() + '   —   press R for a new game', cwpx / 2, chpx / 2 + cell * 0.6);
+    }
+    /* The board area can settle to its real size well after boot — fonts loading, the
+       window finishing its own layout, a sidebar wrapping — so keep checking cheaply
+       from the render loop instead of trusting one measurement plus window events. */
+    if ((frameTicks++ % 24) === 0) relayout();
+    requestAnimationFrame(frame);
+  }
+  var frameTicks = 0;
+
+  function explainEnd() {
+    if (match.reason === 'no strokes left') return 'no stroke left to draw';
+    if (match.reason === 'own goal') return 'won by an own goal';
+    return match.scores[0] + ' – ' + match.scores[1] + ' on goals';
+  }
+
+  /* ---------- match controller ---------- */
+  function newMatch() {
+    match = ENG.createMatch(cfg); board = match.board; cpu = match.cpu;
+    strokes = match.strokes(); logLines = []; lastAiInfo = '';
+    anim = null; flash = null; hint = null; toast = null; hoverNode = -1;
+    padSide = -1;
+    $('log').textContent = '';
+    $('target').textContent = (cfg.firstTo === 1 ? 'next goal wins'
+        : cfg.firstTo ? 'first to ' + cfg.firstTo + ' goals wins'
+        : 'play until the paper is full') +
+      ' · own goals ' + (cfg.ownGoals ? 'count' : 'forbidden');
+    layout();
+    logLine('— new game: ' + nameOf(0) + ' vs ' + nameOf(1) + ' —', '');
+    pump();
+    refreshUi();
+  }
+  function afterStroke() {
+    strokes = match.strokes();
+    if (match.over) { phase = 'over'; refreshUi(); return; }
+    pump();
+    refreshUi();
+  }
+  function pump() {
+    if (match.over) { phase = 'over'; return; }
+    var side = match.ps.side;
+    if (isHuman(side)) { phase = 'wait'; }
+    else { phase = 'think'; askCpu(side); }
+  }
+  function doKick(mv) {
+    if (!mv) return;
+    var evt = match.play(mv);
+    if (!evt) return;
+    kickSound();
+    strokes = match.strokes();
+    var dur = cfg.mode === 'demo' ? 150 : 210;
+    anim = { mv: { from: evt.from, to: evt.to }, t0: lastTs, dur: dur };
+    phase = 'anim';
+    reportEvent(evt);
+    refreshUi();
+  }
+  function reportEvent(evt) {
+    var who = nameOf(evt.side);
+    if (evt.goal) {
+      logLine((evt.ownGoal ? 'OWN GOAL — ' : 'GOAL — ') + nameOf(evt.scorer) + ' ' + match.scores[0] + '–' + match.scores[1], evt.scorer === 0 ? 'g1' : 'g2');
+      toast = { text: evt.ownGoal ? 'own goal!' : 'GOAL!', color: T.warn, until: lastTs + 1400 };
+    }
+    if (evt.bounce && !evt.goal) flash = { until: lastTs + 900 };
+    if (evt.stuck) logLine('no stroke left — ' + nameOf(match.winner) + ' wins', 'w');
+  }
+  function logLine(text, cls) {
+    logLines.push({ text: text, cls: cls });
+    if (logLines.length > 40) logLines.shift();
+    var el = $('log');
+    el.innerHTML = logLines.map(function (l) {
+      return l.cls ? '<span class="' + l.cls + '">' + escapeHtml(l.text) + '</span>' : escapeHtml(l.text);
+    }).join('\n');
+    el.scrollTop = el.scrollHeight;
+  }
+  function escapeHtml(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  /* ---------- CPU ---------- */
+  var worker = null, workerCfgKey = null, workerTimer = null;
+  function ensureWorker() {
+    if (worker || workerCfgKey === 'failed') return;
+    try {
+      var src = document.getElementById('engine-src').textContent +
+        "\nself.onmessage=function(e){var d=e.data;" +
+        "var s=FBEngine.session(d.cfg);" +
+        "var ps=FBEngine.stateFrom(s.board,d.used,d.ball,d.side);" +
+        "var mv=s.cpu.choose(d.level,ps,d.budget);" +
+        "self.postMessage({move:mv?{edge:mv.edge,from:mv.from,to:mv.to,dir:mv.dir,isBounce:mv.isBounce,isGoal:mv.isGoal,isOwnGoal:mv.isOwnGoal,depth:mv.depth,nodes:mv.nodes,ms:mv.ms}:null,info:s.cpu.stats?null:null});};";
+      var url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      worker = new Worker(url);
+      worker.onerror = function () { worker = null; workerCfgKey = 'failed'; };
+      worker.onmessage = function (ev) {
+        if (workerTimer) { clearTimeout(workerTimer); workerTimer = null; }
+        if (phase !== 'think') return;
+        applyCpuMove(ev.data && ev.data.move);
+      };
+    } catch (e) { worker = null; workerCfgKey = 'failed'; }
+  }
+  function askCpu(side) {
+    var budget = ENG.LEVELS[cfg.level].budget;
+    ensureWorker();
+    if (worker) {
+      worker.postMessage({ cfg: { cellCols: cfg.cellCols, cellRows: cfg.cellRows, goalHalf: cfg.goalHalf, ownGoals: cfg.ownGoals }, used: match.ps.used, ball: match.ps.ball, side: side, level: cfg.level, budget: budget });
+      workerTimer = setTimeout(function () {
+        if (phase !== 'think') return;
+        var ms = match.moves();
+        applyCpuMove(ms.length ? ms[(Math.random() * ms.length) | 0] : null);
+      }, budget + 4000);
+    } else {
+      var mv = cpu.choose(cfg.level, match.ps, Math.min(budget, 900));
+      applyCpuMove(mv);
+    }
+  }
+  function applyCpuMove(mv) {
+    if (phase !== 'think') return;
+    if (!mv) {
+      match.over = true; match.winner = match.ps.side ^ 1; match.reason = 'no strokes left';
+      logLine('no stroke left — ' + nameOf(match.winner) + ' wins', 'w');
+      phase = 'over'; refreshUi(); return;
+    }
+    if (mv.depth) lastAiInfo = 'CPU ' + cfg.level + ': depth ' + mv.depth + ', ' + (mv.nodes || 0).toLocaleString() + ' positions, ' + ((mv.ms || 0) / 1000).toFixed(1) + ' s';
+    doKick(mv);
+  }
+
+  /* ---------- UI ---------- */
+  var padSide = -1;
+  function buildPad(side) {
+    if (side === padSide) return;
+    padSide = side;
+    var pad = $('pad');
+    pad.replaceChildren();
+    [0, 1, 2, 3, -1, 4, 5, 6, 7].forEach(function (d) {
+      if (d === -1) {
+        var mid = document.createElement('div');
+        mid.className = 'mid'; mid.textContent = 'kick';
+        pad.appendChild(mid); return;
+      }
+      var p = PAD[d];
+      var el = document.createElement('div');
+      el.className = 'k hintable'; el.dataset.dir = d;
+      el.innerHTML = padLabel(p, side);
+      el.addEventListener('click', function () { kickDir(d); });
+      pad.appendChild(el);
+    });
+  }
+  function padLabel(p, side) {
+    var arr = side === 0 ? p.p1 : p.p2;
+    if (side !== 0) return '<b>' + arr.map(function (b) { return b[1]; }).join(' · ') + '</b>';
+    var num = arr.filter(function (b) { return b[0].indexOf('Numpad') === 0; })
+      .map(function (b) { return b[1].replace('num ', ''); });
+    var letters = arr.filter(function (b) { return b[0].indexOf('Numpad') !== 0; })
+      .map(function (b) { return b[1]; });
+    return '<b>' + letters.join(' ') + '</b>' + (num.length ? '<small>num ' + num.join(' ') + '</small>' : '');
+  }
+  function refreshUi() {
+    $('sc1').textContent = match.scores[0];
+    $('sc2').textContent = match.scores[1];
+    $('box1').firstChild.textContent = nameOf(0) + (cfg.mode !== '2p' && cfg.mode !== 'demo' && isHuman(0) ? ' (you)' : '');
+    $('box2').firstChild.textContent = nameOf(1) + (cfg.mode !== '2p' && cfg.mode !== 'demo' && isHuman(1) ? ' (you)' : '');
+    $('box1').classList.toggle('active', !match.over && match.ps.side === 0);
+    $('box2').classList.toggle('active', !match.over && match.ps.side === 1);
+
+    var st = $('status'), sub = $('substatus'), pw = $('padwrap');
+    var side = match.ps.side, col = side === 0 ? 'p1' : 'p2';
+    buildPad(side);
+    pw.className = 'padwrap ' + col + (phase === 'wait' && isHuman(side) ? '' : ' idle');
+    $('padTitle').textContent = nameOf(side) + "'s keys" + (isHuman(side) && phase === 'wait' ? ' — click to kick' : '');
+    Array.prototype.forEach.call($('pad').children, function (el) {
+      if (el.dataset.dir == null) return;
+      el.classList.toggle('dead', !(phase === 'wait' && isHuman(side)));
+    });
+
+    if (match.over) {
+      st.innerHTML = '<b>' + nameOf(match.winner) + ' won</b><br>' + explainEnd();
+    } else if (phase === 'think') {
+      st.innerHTML = nameOf(side) + ' is thinking<span class="again">…</span>';
+    } else {
+      var msg = nameOf(side) + ' to kick';
+      if (phase === 'wait' && isHuman(side) && midBounceChain()) msg += ' <span class="again">— bounce, kick again!</span>';
+      st.innerHTML = msg;
+    }
+    var drawn = strokesDrawn();
+    sub.innerHTML = 'strokes drawn: ' + drawn + ' / ' + match.board.playable +
+      ' · pitch ' + match.board.cellCols + '×' + match.board.cellRows + ' cells (' + match.board.W + '×' + match.board.H + ' dots)' +
+      (lastAiInfo ? '<br>' + escapeHtml(lastAiInfo) : '');
+    $('bMode').textContent = (cfg.mode === '2p' ? 'vs CPU' : '2 players') + '  F3';
+    $('bSound').textContent = 'Sound ' + (cfg.sound ? 'on' : 'off');
+    $('bUndo').disabled = !match.hist.length || phase === 'anim' || phase === 'think';
+    $('bHint').disabled = !(phase === 'wait' && isHuman(match.ps.side));
+  }
+  /* true when the position on the paper is the middle of a bounce chain: the same
+     player has to kick again, and the ball really is where that last stroke ended */
+  function midBounceChain() {
+    var h = match.hist;
+    if (!h.length) return false;
+    var r = h[h.length - 1];
+    if (r.kind !== 'move' || r.kickoff) return false;
+    return r.mv.isBounce && !match.over && match.ps.ball === r.mv.to;
+  }
+  function strokesDrawn() {
+    var n = 0, u = match.ps.used;
+    for (var i = 0; i < u.length; i++) if (u[i]) n++;
+    return n - board.preCount;
+  }
+
+  function kickDir(dir) {
+    if (phase !== 'wait') return;
+    var side = match.ps.side;
+    if (!isHuman(side)) return;
+    var mv = match.pick(dir);
+    if (!mv) { invalid(); return; }
+    doKick(mv);
+  }
+  function invalid() {
+    toast = { text: 'no such stroke', color: T.toast, until: lastTs + 700 };
+  }
+  function notMyTurn() {
+    toast = { text: nameOf(match.ps.side) + ' is to kick', color: T.toast, until: lastTs + 800 };
+  }
+
+  /* ---------- input ---------- */
+  function toggleCpu() {
+    cfg.mode = cfg.mode === '2p' ? 'youP1' : '2p';
+    $('selMode').value = cfg.mode; savePrefs(); newMatch();
+  }
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { $('help').hidden = true; return; }
+    var code = e.code || '';
+    /* H asks for a hint — the key people reach for, and one the key pads leave free. T still
+       works. Help is F1, because ?, / and the letters around it all belong to the players. */
+    if (code === 'F1') { e.preventDefault(); $('help').hidden = !$('help').hidden; return; }
+    if (code === 'F3') { e.preventDefault(); toggleCpu(); return; }
+    if (code === 'KeyR') { e.preventDefault(); newMatch(); return; }
+    if (code === 'KeyU') { e.preventDefault(); doUndo(); return; }
+    if (code === 'KeyH' || code === 'KeyT') { e.preventDefault(); doHint(); return; }
+    if (code === 'KeyM') { e.preventDefault(); cfg.sound = !cfg.sound; savePrefs(); refreshUi(); return; }
+    if (code.indexOf('Arrow') === 0) e.preventDefault();
+    if (e.repeat) return;
+    initAudio();
+    for (var side = 0; side < 2; side++) {
+      if (CODE2DIR[side][code] == null) continue;
+      if (phase === 'think') return;
+      if (phase !== 'wait' || match.ps.side !== side || !isHuman(side)) { notMyTurn(); return; }
+      kickDir(CODE2DIR[side][code]);
+      return;
+    }
+  });
+
+  canvas.addEventListener('pointermove', function (e) {
+    var r = canvas.getBoundingClientRect();
+    hoverNode = nodeAt((e.clientX - r.left), (e.clientY - r.top));
+  });
+  canvas.addEventListener('pointerleave', function () { hoverNode = -1; });
+  canvas.addEventListener('pointerdown', function (e) {
+    initAudio();
+    var r = canvas.getBoundingClientRect();
+    var n = nodeAt((e.clientX - r.left), (e.clientY - r.top));
+    if (n < 0 || phase !== 'wait') return;
+    var side = match.ps.side; if (!isHuman(side)) return;
+    var ms = match.moves();
+    for (var i = 0; i < ms.length; i++) if (ms[i].to === n) { doKick(ms[i]); return; }
+    invalid();
+  });
+
+  function doUndo() {
+    if (phase === 'anim' || phase === 'think') return;
+    if (!match.hist.length) return;
+    var solo = cfg.mode === 'youP1' || cfg.mode === 'youP2';
+    match.undo();
+    if (solo) {
+      /* in solo play one press rewinds the CPU's reply too, back to my own kick */
+      var guard = 0;
+      while (match.hist.length && guard++ < 400) {
+        if (match.over || isHuman(match.ps.side)) break;
+        match.undo();
+      }
+    }
+    strokes = match.strokes(); anim = null; hint = null; flash = null;
+    logLine('— one kick erased —', '');
+    pump(); refreshUi();
+  }
+  function doHint() {
+    if (phase !== 'wait') return;
+    var side = match.ps.side; if (!isHuman(side)) return;
+    var mv = cpu.choose(cfg.level === 'easy' ? 'hard' : cfg.level, ENG.cloneState(board, match.ps), 900);
+    if (!mv) { invalid(); return; }
+    hint = { from: mv.from, to: mv.to, until: lastTs + 2500 };
+    logLine('hint: ' + dirName(mv.dir) + (mv.isBounce ? ' (bounce)' : ''), side === 0 ? 'g1' : 'g2');
+  }
+  function dirName(d) { return ['up-left', 'up', 'up-right', 'left', 'right', 'down-left', 'down', 'down-right'][d]; }
+
+  /* ---------- sound: prefers the original kick (n).wav when served over http ---------- */
+  var actx = null, kickBufs = null, kickTried = false;
+  function initAudio() {
+    if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+    if (actx && !kickTried) {
+      kickTried = true;
+      var names = ['kick (1).wav', 'kick (2).wav', 'kick (3).wav'];
+      Promise.all(names.map(function (nm) {
+        return fetch(nm).then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+          .then(function (b) { return b ? actx.decodeAudioData(b) : null; });
+      })).then(function (bs) {
+        var ok = bs.filter(Boolean);
+        if (ok.length) kickBufs = ok;
+      }).catch(function () {});
+    }
+  }
+  function kickSound() {
+    if (!cfg.sound) return;
+    initAudio(); if (!actx) return;
+    if (kickBufs) {
+      var s = actx.createBufferSource(); s.buffer = kickBufs[(Math.random() * kickBufs.length) | 0];
+      var gg = actx.createGain(); gg.gain.value = 0.45; s.connect(gg); gg.connect(actx.destination); s.start();
+      return;
+    }
+    var now = actx.currentTime;
+    var len = Math.floor(actx.sampleRate * 0.09);
+    var buf = actx.createBuffer(1, len, actx.sampleRate), data = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    var src = actx.createBufferSource(); src.buffer = buf;
+    var bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100 + Math.random() * 500; bp.Q.value = 1.1;
+    var gg2 = actx.createGain(); gg2.gain.value = 0.5;
+    src.connect(bp); bp.connect(gg2); gg2.connect(actx.destination); src.start(now);
+    var osc = actx.createOscillator(); osc.frequency.value = 150 + Math.random() * 40;
+    var g3 = actx.createGain(); g3.gain.setValueAtTime(0.22, now); g3.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.connect(g3); g3.connect(actx.destination); osc.start(now); osc.stop(now + 0.14);
+  }
+
+  /* ---------- settings wiring ---------- */
+  function fillLevels() {
+    var sel = $('selLevel');
+    Object.keys(ENG.LEVELS).forEach(function (k) {
+      var o = document.createElement('option'); o.value = k; o.textContent = ENG.LEVELS[k].label; sel.appendChild(o);
+    });
+  }
+  function readSettings() {
+    cfg.mode = $('selMode').value;
+    cfg.level = $('selLevel').value;
+    var bc = BOARD_PRESETS[$('selBoard').value] || [8, 12];
+    var nCols = bc[0], nRows = bc[1];
+    var nOwn = $('selOwn').value === 'allow';
+    var nFirst = parseInt($('selMatch').value, 10) || 0;
+    var restart = cfg.cellCols !== nCols || cfg.cellRows !== nRows || cfg.ownGoals !== nOwn || cfg.firstTo !== nFirst;
+    cfg.cellCols = nCols; cfg.cellRows = nRows; cfg.ownGoals = nOwn; cfg.firstTo = nFirst;
+    cfg.hints = $('chkHints').checked;
+    var wantTheme = ['light', 'dark', 'auto'].indexOf($('selTheme').value) >= 0 ? $('selTheme').value : 'light';
+    if (wantTheme !== cfg.theme) { cfg.theme = wantTheme; savePrefs(); applyTheme(); return; }
+    savePrefs();
+    if (restart) { newMatch(); return; }
+    refreshUi();
+    /* switching who controls a side must immediately let that side act */
+    if (phase !== 'anim' && phase !== 'think') pump();
+  }
+  function applyCfgToUi() {
+    $('selMode').value = cfg.mode;
+    $('selLevel').value = cfg.level;
+    $('selBoard').value = cfg.cellCols + ',' + cfg.cellRows;
+    if (!$('selBoard').value) $('selBoard').value = '8,12';
+    $('selMatch').value = String(cfg.firstTo);
+    if (['0', '1', '3', '5'].indexOf(String(cfg.firstTo)) < 0) cfg.firstTo = 3;
+    $('selMatch').value = String(cfg.firstTo);
+    $('selOwn').value = cfg.ownGoals ? 'allow' : 'forbid';
+    $('chkHints').checked = !!cfg.hints;
+    $('selTheme').value = themeChoice();
+  }
+
+  $('bNew').addEventListener('click', function () { newMatch(); });
+  $('bUndo').addEventListener('click', doUndo);
+  $('bHint').addEventListener('click', doHint);
+  $('bMode').addEventListener('click', toggleCpu);
+  $('bSound').addEventListener('click', function () { cfg.sound = !cfg.sound; savePrefs(); refreshUi(); });
+  $('bHelp').addEventListener('click', function () { $('help').hidden = false; });
+  $('bHelpClose').addEventListener('click', function () { $('help').hidden = true; });
+  $('settings').addEventListener('change', readSettings);
+  window.addEventListener('resize', relayout);
+  window.addEventListener('load', relayout);
+  if (window.ResizeObserver) { try { new ResizeObserver(relayout).observe(wrap); } catch (e) {} }
+
+  fillLevels(); applyCfgToUi(); newMatch();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+# The published repository is the game itself: index.html + README.md.
+# Everything below stays on this machine and is not pushed.
+
+# The original pygame version this game was rewritten from, and its assets
+football.pyw
+ball.png
+ball.ico
+__pycache__/
+*.py[cod]
+
+# Sound samples the page picks up only when it is served over http
+# (it synthesises its own kick otherwise, so they are not needed to run it)
+kick (1).wav
+kick (2).wav
+kick (3).wav
+
+# The reverse-engineered rule spec and the development tests
+RULES.md
+tools/
+
+# Screenshots of the page (local documentation of the look)
+preview.png
+preview-demo.png
+preview-dark.png
+
+# Scratch / QA artifacts from this folder: headless-Chrome runs, captured stdout/stderr,
+# temporary DOM dumps and test logs
+.chrome-tmp/
+.chrome-*
+.o.txt
+.e.txt
+.a.txt
+.b.txt
+.ae.txt
+.be.txt
+.dom.html
+.full.txt
+*.log
+
+# OS and editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+*~
+
+# No dependencies today (the tests only need Node itself), but keep this honest
+node_modules/
