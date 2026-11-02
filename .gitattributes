@@ -1,0 +1,10 @@
+# Line endings are stored as LF and checked out as LF, on every machine. A clone
+# on Windows is then byte-identical to a clone on Linux, the test tools read the
+# same bytes the browser does, and git stops rewriting files behind the editor's
+# back. A per-machine core.autocrlf cannot promise any of that.
+* text=auto eol=lf
+
+# Never converted, never diffed as text.
+*.png  binary
+*.ico  binary
+*.wav  binary
