@@ -2,14 +2,10 @@
 # measured every number in the README, and the screenshots the README shows.
 # What is left below stays on this machine.
 
-# The original pygame program has been deleted from this folder. Its ball sprite is
-# the one asset this page never uses — the ball is drawn, not loaded — so it stays
-# out of the repo. The kick samples are published: the page uses them when it is
-# served over http and synthesises its own kick without them.
-ball.png
-ball.ico
-__pycache__/
-*.py[cod]
+# Nothing here is Python any more: the original `football.pyw` and its ball sprite
+# were deleted once the rewrite was complete (RULES.md is what the original program
+# left behind). The kick samples are published on purpose — the page uses them when
+# it is served over http, and synthesises its own kick without them.
 
 # Scratch / QA artifacts from this folder: headless-Chrome profiles, captured
 # stdout/stderr, temporary DOM dumps, probe frames, split-patch leftovers, logs

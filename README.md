@@ -350,14 +350,15 @@ on an idle machine if you want the numbers above.
 | [`tools/trace.mjs`](tools/trace.mjs) | ad-hoc: dump the CPU's move scores in one position |
 | [`tools/shot.mjs`](tools/shot.mjs), [`tools/pageeval.mjs`](tools/pageeval.mjs) | drive a headless Chrome over CDP: the first takes the screenshots above, the second reads the page's own text back — which is where the numbers quoted under them come from |
 | [`preview.png`](preview.png), [`preview-demo.png`](preview-demo.png), [`preview-dark.png`](preview-dark.png) | screenshots of the page (light, CPU vs CPU, dark), so the look is reviewable without opening the game |
+| [UNLICENSE](UNLICENSE) | the dedication: the code and the writing here are public domain — do what you like, no permission asked, no warranty given |
 
 The repository is the game, the rule spec it was written against, the tools that measured every number in this
-file, and the screenshots above. What stays on the machine where it was made is the noise around that: the
-headless-Chrome profiles, captured stdout and probe frames of the measuring runs, and `ball.png` / `ball.ico` —
-the original's ball sprite, which this page never loads because the ball is drawn. The original `football.pyw`
-itself has been deleted from this folder: [RULES.md](RULES.md) is what it left behind, and the game does not read
-it. Nothing here was measured against a test-only copy of the engine: the browser and the tools load the same
-`engine.js`.
+file, the screenshots above, and [UNLICENSE](UNLICENSE). Nothing else is needed to play it, and nothing else has
+been kept: the original `football.pyw`, its ball sprite (`ball.png` and `ball.ico`, which this page never loads
+because the ball is drawn) and the local leftovers of the measuring runs — headless-Chrome profiles, captured
+stdout, probe frames, logs — are all deleted. [RULES.md](RULES.md) is what the original program left behind, and
+the game does not read it. Nothing here was measured against a test-only copy of the engine: the browser and the
+tools load the same `engine.js`.
 
 ## Things it does not do
 
@@ -365,3 +366,14 @@ Two players in the same browser tab only — no accounts, no online play, no boa
 a goal as an instant win at every match length, which is right for "next goal wins" and an over-valuation
 in a first-to-5 game (it makes the CPU fight hard for every single goal, which is rarely boring). Undo does
 not undo into a different pitch size or mode. The paper is not savable or printable — it is a scratch pad.
+
+## License
+
+[UNLICENSE](UNLICENSE): the game (`index.html`, `game.css`, `engine.js`, `app.js`), the tools, and everything
+written in this file and in [RULES.md](RULES.md) are dedicated to the public domain. Copy it, sell it, rewrite it,
+take it apart and keep none of it — no permission needed, and no warranty of any kind is given.
+
+One thing in the folder is not mine to give away: the three `kick (1..3).wav` samples came from the original game
+rather than being written for this one, so their status is only as good as the original's and I am not claiming
+them under the dedication. They are also entirely optional — the page synthesises its own kick and plays the same
+without them — so delete them if their provenance matters to you.
