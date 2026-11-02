@@ -1,13 +1,15 @@
-# Paper Football — `index.html`
+# Paper Football — open `index.html`
 
-A self-contained rewrite of [`football.pyw`](football.pyw) in HTML + JavaScript: the same pen-on-graph-paper
-game, the same pitch, complete rules, and a CPU that actually plays the game instead of wandering toward a
-goal. Rules of the original were reverse-engineered first and are written up in [RULES.md](RULES.md); this
-file implements them with the ambiguities resolved (see [Deliberate changes](#deliberate-changes)).
+A rewrite of [`football.pyw`](football.pyw) in plain HTML + JavaScript: the same pen-on-graph-paper game, the
+same pitch, complete rules, and a CPU that actually plays the game instead of wandering toward a goal. Rules of
+the original were reverse-engineered first and are written up in [RULES.md](RULES.md); this implements them with
+the ambiguities resolved (see [Deliberate changes](#deliberate-changes)).
 
-Everything the game needs is inside [`index.html`](index.html): no CDN, no build step, no image or sound
-file required. The ball is drawn as an ink sketch on the canvas and the kick is synthesised with WebAudio.
-If you serve the folder over http, the original `kick (1..3).wav` files are picked up automatically.
+The game is four files and nothing else: [`index.html`](index.html) is the markup, [`game.css`](game.css) the
+paper, [`engine.js`](engine.js) the rules and the search, [`app.js`](app.js) the drawing and the controller.
+No CDN, no build step, no image or sound file required — the ball is drawn as an ink sketch on the canvas and
+the kick is synthesised with WebAudio. Open `index.html` straight from disk; it does not need a server. If you
+do serve the folder over http, the original `kick (1..3).wav` files are picked up automatically.
 
 ## Open it
 
@@ -80,10 +82,20 @@ that border and are blocked without being drawn, which leaves 312 playable.
 
 The engine is a full game-tree search, not a distance heuristic:
 
-* negamax with alpha-beta, iterative deepening, zobrist-keyed transposition table (verified with a second
-  hash), move ordering (TT move → goal → avoid own goal → bounce → toward the target goal), and a hard
-  per-move time budget. A Web Worker does the thinking so the page never freezes; if workers are blocked,
-  the same code runs synchronously with a smaller budget.
+* negamax with fail-soft alpha–beta, principal-variation search at internal nodes, aspiration windows at the
+  root, iterative deepening, a zobrist-keyed transposition table (verified with a second hash), move ordering
+  (TT move → goal → avoid own goal → bounce → toward the target goal), and a hard per-move time budget.
+* **The search is not started over on every move.** One table is kept for the whole match, the position the
+  CPU is actually asked to play is stored in it like any other, and a search begins one ply past whatever is
+  already proved there — re-walking a depth that is already proved proves nothing new. A position the engine
+  has already worked out is then answered out of the table without looking at a single new position; the suite
+  asserts that contract by name (no search, the table's proof depth reported, the same move and the same
+  score), and the page says it in words — that the answer came out of a proof made during an earlier
+  kick, naming the depth that proof reached — instead of printing a depth of 1 for it. Measured on four
+  positions of one real game in order: one table kept looks at 28–30 % fewer positions than an empty table for
+  each. It shows on the page too: a whole CPU-vs-CPU demo match at Expert plays out in well under a minute on
+  this machine, and the move that ends one of those games examined not one new position — which is what the
+  status line in the screenshots below says.
 * **The bounce chain is in the tree.** Landing on a lined dot means the *same* player kicks again, so the
   tree does not alternate; the search keeps the same maximising node instead of negating, which is exactly
   the tactical idea the original CPU could not see. The test suite has a position where `hard` walks a
@@ -91,14 +103,60 @@ The engine is a full game-tree search, not a distance heuristic:
 * The leaf evaluation is one BFS over still-blank strokes: how many kicks each side is from each goal,
   plus how many strokes are still available next to the ball. Mate distances are stored and re-based
   through the transposition table, so a forced win is preferred earlier and a loss later.
-* Levels — the menu shows nothing but these names, so here is what they mean:
-  `easy` = random among moves that do not lose on the spot, and it takes a free goal;
-  `normal` = 6 plies / 0.5 s (about what the original CPU was reaching for, but with you in the loop);
-  `hard` = 12 plies / 1.5 s; `expert` = 18 plies / 2.4 s; `master` = 26 plies / 3.5 s. The top rung used to
-  be called `expert`; it is now `master`, and `expert` is a new rung below it — a remembered `expert` setting
-  is therefore one rung weaker, and `master` gives the old strength back. The status line reports depth, node
-  count and thinking time of every CPU move, so the difference between levels is visible on screen, and the
-  suite asserts that the rungs are ordered: each one deeper than the last, and given more time to get there.
+* **The thinking is sliced, not threaded.** The search runs on the page's own thread in slices of about 60 ms,
+  yielding to the browser between them, so the paper keeps drawing and the depth it has proved so far is
+  written on the page while it thinks. It is not in a worker, because the game is published as files to open
+  from disk and a page opened that way cannot start one. Measured in current Chrome from a `file://` page:
+
+  | what the page tries | what happens |
+  |---|---|
+  | `new Worker('engine.js')` | throws — the script cannot be accessed from origin `null` |
+  | `new Worker(blobUrl)` with the engine text in a Blob | constructs, and never runs |
+  | `importScripts('engine.js')` | throws — invalid URL |
+  | `fetch('engine.js')`, `XMLHttpRequest` | rejected, failed to load |
+  | `SharedArrayBuffer` | `undefined` — no shared-memory route either |
+  | `navigator.hardwareConcurrency` | 16 cores, unreachable from this page |
+
+  [Threads](#threads) says what they would have bought, and why that is still not worth giving up the
+  double-click for.
+
+* A level is a **proved depth plus a clock**, and the depths were picked from what this search can actually
+  prove — not from what sounds impressive. `tools/ladder.mjs` measures it on the classic pitch (one thread,
+  empty table, the opening plus four positions taken along one 163-stroke game):
+
+  | rung | proved depth | clock | what that costs, measured |
+  |---|---|---|---|
+  | `easy` | no search: random among moves that do not lose on the spot, and it takes a free goal | — | — |
+  | `normal` | 6 | 0.5 s | ~1 ms mid-game, proved at every position sampled — about what the original CPU was reaching for, but with you in the loop |
+  | `hard` | 12 | 1.0 s | 22 ms median, proved at 4 of the 5 positions — the fifth was solved at depth 9 |
+  | `expert` | 16 | 1.5 s | 159 ms median, proved at 3 of 5; two of those positions were themselves proved at 9 and 13 and stopped on their own |
+  | `master` | no ceiling it can reach (26) | 3.5 s | asked at a cap of 20 the ceiling is proved at 1 of 5 positions, at 22 and 24 at none — median 17 plies, and the clock ends the search |
+
+  With no ceiling in the way, 200 / 400 / 800 / 1600 / 3200 ms of thinking proved a median depth of
+  13 / 14 / 15 / 16 / 17 on that sample — one extra ply per doubling of the clock. That law is what the
+  rungs are placed by where the clock is the binding constraint: `normal` and `hard` are defined by a depth
+  they can prove well inside their clock, `expert` by one it can still prove inside 1.5 s but only just, and
+  `master` has no ceiling it can reach at 3.5 s, so its strength is the clock itself. The absolute numbers
+  depend on which positions a sample contains (this one includes two positions whose line to a goal was
+  *proved* at depth 9 and 13, so the search stopped there whatever the clock allowed, and they drag the
+  median down); the slope is what repeats from sample to sample. The old Hard → Expert step claimed six plies
+  and 32×, and it was fictional in both directions: 12 and 18 were each proved in well under a second
+  inside their budgets, so the two levels played the same game. The suite asserts reachability on its own
+  position as well: depth 6 in 0 ms, 12 in 13 ms, 16 in 84 ms, and `master` proving 19 plies when its 3.5 s
+  ran out — which is the depth that rung actually plays at, and what the status line prints.
+
+  The top rung used to be called `expert`; it is now `master`, and `expert` is a new rung below it — a
+  remembered `expert` setting is therefore stronger than the old `hard` but weaker than the old `expert`, and
+  `master` gives the old strength back. A saved setting naming a level that no longer exists falls back to
+  `normal`.
+
+  The suite asserts that this ladder is real rather than printed: five rungs, each deeper and slower than the
+  one below, the Hard → Expert step at most four plies, bare names in the menu, `normal` still at six plies —
+  and, measured on a mid-game position with an empty table, asked exactly the way the page asks (no depth
+  override), each ceiling actually proved inside its own clock: `hard` 45 ms, `expert` 370 ms in the run whose
+  numbers are in the table above. `master` is checked for the opposite, that it does *not* reach its ceiling
+  and that the clock is what stops it. The status line reports depth, positions searched and thinking time of
+  every CPU move, so the difference between levels is visible on the paper rather than only in this file.
 * `normal`, `hard`, `expert` and `master` play the same answer from the same position. When several strokes score
   exactly the same the CPU keeps the order the search sorted them in — goal, avoiding own goals, keeping
   the bounce tempo — instead of drawing one out of a hat; only `easy` varies its play. This also makes the
@@ -106,33 +164,69 @@ The engine is a full game-tree search, not a distance heuristic:
   tactical test then failed depending on load).
 
 Measured on an idle machine, one run of `node tools/selftest.mjs`: sudden-death matches on the classic pitch,
-colours alternated, the weaker-named side given 0.25 s a move and the stronger 1.2 s (the suite prints the
-depth each side *actually reached*, since a level means a depth *and* the time to reach it):
+colours alternated, **each side given the clock its own rung ships with** — because that is what a player
+meets, and it is why this replaced a table where the stronger side was handed 1.2 s whatever its level claimed.
+The two pairings the suite *asserts* play four games each, because an assertion has to survive one unlucky game:
+a two-game version of `easy` vs `master` measured 1 – 1 once, which proved nothing either way. The two
+report-only pairings involving the top rung play two games, since that rung spends its whole clock on every wide
+position. The depth column is the **mean over the moves that side actually played**: a whole game includes the
+opening, the widest position there is, so these numbers sit below the per-position ones in the table above.
 
-| pairing | result | strokes/game | depth reached |
+| pairing | result | strokes/game | mean depth over the game |
 |---|---|---|---|
-| easy vs master | master 4 – 0 | ~73 | no search vs ~13 plies |
-| easy vs normal | normal 4 – 0 | ~15 | no search vs ~5 plies |
-| normal vs master | master 4 – 0 (was 1 – 3 and 2 – 2 against ~15 plies on the original's hatched pitch) | ~76 | 5.7 vs ~14 plies |
-| hard vs expert | **2 – 2** | ~180 | 11.8 vs 15.4 plies |
-| expert vs master | master 3 – 1 | ~165 | **15.2 vs 15.2** — the extra second bought no depth, so this pairing said nothing about depth |
+| `easy` vs `master` | master 4 – 0 | ~47 | no search vs 14.8 |
+| `easy` vs `normal` | normal 4 – 0 | ~19 | no search vs 5.6 |
+| `normal` vs `master` | master 2 – 0 | ~65 | 6.0 vs 19.1 |
+| `hard` vs `expert` | **expert 3 – 1** | ~123 | 12.0 vs 15.8 |
+| `expert` vs `master` | **expert 2 – 0** | ~60 | 15.5 vs 17.7 |
 
-**Read the bottom two rows as the finding, not as noise.** 12 plies against 18 split their games 2 – 2, and 18
-against 26 went one way while both sides stopped at the same depth. The gaps that *do* separate on this pitch
-are the structural ones: no search against any search, and 6 plies against 26 — the same 6-ply level held its
-own against ~26 on the original's hatched pitch, where the strips beside the goal lines were playable. So the
-menu is an honest ladder of *depth and thinking time*, which is exactly what the status line lets you verify;
-it is not a claim that each rung is a meaningfully better player. The reason is the same in every case: with
-12–26 plies, negamax happily commits to lines whose *leaf* score looks better under a distance-and-open-space
-evaluation but which are not better positions — a deep search optimising a shallow evaluation. The evaluator is
-the thing to improve first (`RULES.md` §10 is written as a prompt-ready spec for exactly that). A time-limited
-search also reaches slightly different depths each run, and an earlier build of this engine picked *randomly*
+The fourth row is the reason the rungs were retuned. With the old 12-vs-18 depths that pairing split its games
+2 – 2, because both levels were proved in well under their budgets and were therefore playing the same game.
+Given their own clocks `expert` took 3 of 4 from `hard` (4 of 4 in the run before this one). The fifth row is
+the honest half of the same experiment, and this run says more than the earlier ones did: the side that proved
+**17.7** plies lost both games to the side that proved **15.5**; the run before put it the same way at 20.7
+against 15.5, and an earlier build drew it 1 – 1. So the
+menu is an honest ladder of depth and thinking time — which the status line lets anyone check move by move —
+and not a claim that each rung is a meaningfully better player once both are searching properly: above Expert
+the clock buys provable depth and, in this many games, has not bought results, which is a finding about this
+evaluation rather than a regression. The reason is unchanged: at 12–18 plies negamax happily commits to lines
+that only *look* better under a
+distance-and-open-space evaluation — a deep search optimising a shallow evaluation. The evaluator is the thing
+to improve first (`RULES.md` §10 is written as a prompt-ready spec for exactly that). A time-limited search
+also reaches slightly different depths from run to run, and an earlier build of this engine picked *randomly*
 among equal-scoring moves, which moved a pairing by a game either way. That is why the suite reports these
-pairings instead of asserting them, and why the depth both sides really reached is printed next to the score.
+pairings instead of asserting them, and why the depth both sides really reached is printed next to the score —
+on the paper as well as in the test output.
 
 Since the next goal wins, expect a long game before the one goal that ends it. The way to beat the strong
 levels is the way the game is really won: not by shooting, but by leaving the opponent with no stroke left to
 draw. The CPU plays that endgame deliberately — expect to lose the paper if you only attack.
+
+### Threads
+
+Sixteen cores are idle while the CPU thinks, and the game uses one of them. That is a consequence of the
+publishing choice, not of the engine: the design keeps all the state in plain typed arrays, so the search
+parallelises easily — `tools/threads.mjs` runs it as four independent engine instances, each with its own
+transposition table, and gives each of them one of the answers at the root with a quarter of the clock, so the
+total thinking time per move is exactly what one core gets. On the classic pitch at Master:
+
+```
+one core, one table, 3500 ms a move:    won 0 of 2  (median depth proved 20)
+4 cores, 4 private tables, 875 ms each: won 2 of 2  (median depth proved per root answer: 18)
+avg 85 strokes a game, 0 anomalies
+```
+
+The split side scores *every* answer at the root to a median depth of 18; the single core spends the same
+wall-clock time proving one line to a median of 20 and leaves the remaining answers merely bounded rather than
+proved. Covering the root beat going deeper in both games this tool plays (134 and 35 strokes, colours
+alternated, no illegal move), and it came out the same way in an earlier run of it. Two games are a hint, not a
+finding, and the same caveat as the ladder pairings applies: at these depths the leaf evaluation decides a lot
+of the game. What is not a hint is the cost: each core needs its own table, so the cross-move reuse measured
+above — a position already seen costs nothing at all, and a chain of real positions costs 28–30 % less work —
+is lost across cores, and the whole thing needs the folder served over http, because a page opened
+from disk cannot start a worker at all (the table in [The CPU](#the-cpu) is the measurement). So the shipped
+game stays single-threaded and keeps one table for the whole match; the tool stays so the number can be
+re-measured by anyone who would rather serve the folder.
 
 ## Deliberate changes
 
@@ -158,7 +252,7 @@ Compared with `football.pyw`, these are choices, not accidents (the numbering fo
    `QWE/ASD/ZXC` for Player 1.
 7. **No external assets needed**: the ball sprite and the kick sound are generated. `ball.png` and the
    `.wav` files are only used when they can be fetched (http serving).
-8. The AI delay bug (`1500 - waited*10000`) is gone; thinking happens in a worker and never blocks drawing.
+8. The AI delay bug (`1500 - waited*10000`) is gone; the CPU's thinking is sliced and never blocks drawing.
 9. **On light paper Player 1 draws in black, not green.** The original used green for Player 1 and blue for
    Player 2. The real game is played with one black and one blue ballpoint, and black reads better on graph
    paper. Where black would be invisible — the dark sheet — Player 1 goes back to the original green.
@@ -175,14 +269,17 @@ look.
 
 ## Testing it
 
-No dependencies beyond Node (v24 used here). The rules and the AI live in one clearly delimited block of
-`index.html` between `/* ===== ENGINE (pure logic …` and `/* ===== ENGINE END ===== */`, which these
-scripts lift out of the HTML and run head-less:
+No dependencies beyond Node (v24 used here). The rules and the search are in [`engine.js`](engine.js), which is
+DOM-free: the page loads it with a `<script src>`, and the scripts below load the same file and call it — there
+is no test-only copy of the engine that could drift from the one being played.
 
 ```
-node tools/selftest.mjs           # 66 checks: html wiring, pitch geometry and its boundary, rules, undo, self-play, ladder
-node tools/selftest.mjs --fast    # 59 of them — skips the ladder matches, seconds instead of minutes
-node tools/uismoke.mjs            # 14 checks: boots the interface on a stub DOM, drives the key pad and the hotkeys
+node tools/selftest.mjs           # 97 checks: html/css/js wiring, pitch geometry and its boundary, rules, undo, self-play, the ladder, strength matches
+node tools/selftest.mjs --fast    # 90 of them — skips only the strength matches, seconds instead of ~20 minutes
+node tools/uismoke.mjs            # 17 checks: boots the interface on a stub DOM, drives the key pad, the hotkeys and the CPU's thinking slices
+node tools/ladder.mjs             # proved depth against thinking time, position by position — the source of the ladder table
+node tools/bench.mjs normal hard  # what reusing the table across moves saves, move by move
+node tools/threads.mjs 2          # the root split across four engine instances against one core; the argument is how many games
 node tools/trace.mjs hard 800     # prints what the CPU is thinking in a hand-made position
 ```
 
@@ -196,22 +293,41 @@ loses, that an own goal is offered, scores for the other side and loses the matc
 that the first goal ends the match with no kick-off, bit-for-bit undo, that every move the CPU produces is
 legal, that it never passes, and that games end by the rules. The strength menu is asserted too: exactly
 `easy / normal / hard / expert / master`, each rung deeper than the one below it and given more time to get
-there, labelled by its name alone. What is *not* asserted is who wins: the strength ladder is a
-measurement, not a proof: each pairing prints the depth both sides reached, and if the machine was too busy
-for the stronger side to search deeper than the weaker one, the pairing is reported as inconclusive instead of
-failed. Run it on an idle machine if you want the number.
+there, labelled by its name alone, and — the part that was only a printed claim before — every ceiling actually
+proved inside its own clock on a mid-game position asked the way the page asks (in the run that produced the
+tables above: depth 6 in 0 ms, 12 in 13 ms, 16 in 84 ms), while `master` is asserted to be stopped by the clock
+rather than by its ceiling (it had proved 19 of its 26 plies when the 3.5 s ran out). It asserts that a depth
+override is honoured, that the deeper rungs measurably cost more work, that a position already proved is answered
+out of the table with no search at all, and in the interface smoke test that the page keeps its thinking on the
+main thread in slices and never asks for a worker or a second fetch of its own files. What is *not* asserted is
+who wins the strength matches: that is a measurement, not a proof, so each pairing prints the depth both sides
+reached and the result is reported — and the two pairings the suite does assert, where the weakness is
+structural rather than a matter of degree, play four games each so that one lucky game cannot decide them. Run it
+on an idle machine if you want the numbers above.
 
 ## Files
 
 | file | role |
 |---|---|
-| [`index.html`](index.html) | the whole game: engine block, canvas renderer, input, settings, help |
+| [`index.html`](index.html) | the page: markup, settings panel, rules and keys, help — no script or style inside it any more |
+| [`game.css`](game.css) | the paper: graph-paper background, the ink colours, the layout and the key pad |
+| [`engine.js`](engine.js) | the rules and the search, DOM-free — the browser and the test tools load the same file |
+| [`app.js`](app.js) | canvas drawing, input, undo, hints, log, settings, sounds, and the sliced CPU turn |
 | [`RULES.md`](RULES.md) | the rules reverse-engineered from the original, plus the open questions |
 | [`football.pyw`](football.pyw) | the original pygame version, left untouched |
-| [`tools/selftest.mjs`](tools/selftest.mjs) | rules, geometry, self-play and strength checks |
+| [`tools/selftest.mjs`](tools/selftest.mjs) | rules, geometry, interface wiring, self-play and strength checks |
 | [`tools/uismoke.mjs`](tools/uismoke.mjs) | interface boot and click-through test with a stub DOM |
+| [`tools/ladder.mjs`](tools/ladder.mjs) | what a clock proves: proved depth against thinking time, position by position |
+| [`tools/bench.mjs`](tools/bench.mjs) | the same position twice, and a chain of real positions: what reusing the table saves |
+| [`tools/threads.mjs`](tools/threads.mjs) | the root split across private engine instances, played against one core |
 | [`tools/trace.mjs`](tools/trace.mjs) | ad-hoc: dump the CPU's move scores in one position |
 | [`preview.png`](preview.png), [`preview-demo.png`](preview-demo.png), [`preview-dark.png`](preview-dark.png) | screenshots of the page (light, CPU vs CPU, dark), so the look is reviewable without opening the game |
+
+The published repository is only what the game needs: `index.html`, `game.css`, `engine.js`, `app.js`, this
+file and `.gitignore`. The links to `RULES.md`, `football.pyw`, `tools/…` and the screenshots therefore point at
+files that are not on GitHub — they live in the working copy beside the game, and they are where every number in
+this file was measured. Nothing here was measured against a test-only copy of the engine: the browser and the
+tools load the same `engine.js`.
 
 ## Things it does not do
 

@@ -8,9 +8,10 @@
      the name is short and the numbers belong in the rules panel and the README, where they are
      measured rather than advertised.
 
-     The depths below are chosen from what this search can actually prove, measured on five
-     positions of one real game (the opening, two mid-game, two late) with a fresh table each
-     time, one thread:  depth 12 in ~22 ms,  depth 16 in ~160 ms,  depth 20 in ~1.0 s.
+     The depths below are chosen from what this search can actually prove, measured with
+     tools/ladder.mjs on the classic pitch: one thread, empty table, the opening plus four positions
+     taken along one 163-stroke game. Costs there, one thread:  depth 12 in ~22 ms,  depth 16 in
+     ~160 ms,  depth 20 in ~1.0 s.
      With no ceiling in the way, 200/400/800/1600/3200 ms prove a median depth of 13/14/15/16/17
      on that sample: one extra ply per doubling of the clock, which is how the rungs are placed.
      (Two of those positions had a forced line to a goal proved at depth 9 and 13 and stopped

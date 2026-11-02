@@ -146,18 +146,36 @@
     play from game to game. <b>Normal / Hard / Expert / Master</b> run a real negamax search over the whole game
     tree — your bounces and theirs are in the tree, which the original Python CPU did not model — with
     alpha-beta pruning, a transposition table and iterative deepening, and they answer a given position the
-    same way every time. <b>Normal</b> searches 6 kicks deep and is about the strength the original CPU was
-    aiming for; <b>Hard</b> searches 12, <b>Expert</b> 18, <b>Master</b> 26. The top rung used to be called
-    Expert: it is now Master, and Expert is a new rung between it and Hard — if you had the old Expert saved,
-    choose Master to get that strength back. Each step takes roughly twice as long per move (0.5 / 1.5 / 2.4 /
-    3.5&nbsp;s), and the status line reports the depth, node count and thinking time of every CPU move, so what
-    a level is doing is visible. Measured head-to-head, depth alone does not separate neighbouring rungs: the
-    26-ply level took 4 of 4 from the 6-ply one, but <b>Hard</b> against <b>Expert</b> — 12 against 18 — split
-    its games 2 of 4 each, and <b>Expert</b> against <b>Master</b> went to the deeper search only after both
-    sides stopped at the same depth. On the original's pitch six plies held their own against twenty-six. What
-    decides those games is the position evaluation, a distance-and-open-space proxy. If you want a genuinely
-    tougher CPU, the evaluator is what needs improving, not the search. Against the deeper levels expect to win
-    by leaving the opponent without a stroke rather than by goals — that is how this game is really decided.</p>
+    same way every time. A level is a proved depth plus a clock, and the depths were chosen from what this
+    search can actually prove on this pitch: <b>12</b> plies costs about 20&nbsp;ms, <b>16</b> about 150&nbsp;ms,
+    20 about a second, and doubling the clock buys roughly one ply more. So <b>Normal</b> proves 6 (the strength
+    the original CPU was aiming for), <b>Hard</b> 12, <b>Expert</b> 16, and <b>Master</b> has no ceiling it can
+    reach — in 3.5&nbsp;s it proves 17&ndash;22 plies in the mid-game positions that matches are decided in, and in
+    the widest positions the clock, not the depth ceiling, is what ends the search. The old Hard&nbsp;(12) &rarr; Expert&nbsp;(18) step was six plies and both finished in well
+    under a second, which is why they played the same game; the rungs are now placed by what a doubling of the
+    clock actually buys. If you had <b>Expert</b> saved from the previous version you now get a stronger level than
+    before but a weaker one than the old Expert&nbsp;&mdash;&nbsp;that one is now called <b>Master</b>.</p>
+    <p>The status line under the pitch says what each CPU move really did: the depth proved, how many positions
+    it looked at, and the thinking time. It is written while the CPU is still thinking, one search slice at a
+    time, because the search runs on the page's own thread in slices of about 60&nbsp;ms so the paper keeps
+    drawing. It is not in a thread or a worker because a page opened straight from disk cannot start one: measured
+    in current Chrome, <code>new Worker()</code> &mdash;&nbsp;whether the script is a file or a generated Blob
+    &mdash; <code>importScripts</code>, <code>fetch</code> and <code>XMLHttpRequest</code> all fail from the
+    <code>null</code> origin, and <code>SharedArrayBuffer</code> does not exist there. What one thread does get
+    is the whole match's worth of work: the table is kept across moves, and a search starts one ply past any
+    proof it already holds for that position, so a position the CPU has already worked out &mdash;&nbsp;its own
+    earlier line, or one it reached while thinking about the last kick &mdash;&nbsp;is answered from that proof
+    without any searching at all, and the line under the status says that is what happened.
+    <code>tools/threads.mjs</code> measures the alternative anyway &mdash; the same 3.5&nbsp;s split over four
+    private tables, each covering one of the answers at the root &mdash; and it won 2 of 2 games against one table
+    that proved a single line to a median depth of 20 while leaving the other answers bounded, so on this board
+    covering the root beat going deeper down one line. That
+    needs the folder served over http, which the game deliberately does not ask for.
+    Measured head-to-head, depth alone does not separate neighbouring rungs: what decides those games is the
+    position evaluation, a distance-and-open-space proxy, and the match results of every pairing are printed by
+    <code>tools/selftest.mjs</code> and recorded in <code>README.md</code>. Against the deeper levels expect to
+    win by leaving the opponent without a stroke rather than by goals &mdash; that is how this game is really
+    decided.</p>
 
     <h3>What changed compared to <code>football.pyw</code></h3>
     <ul>
