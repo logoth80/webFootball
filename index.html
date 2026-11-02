@@ -57,8 +57,12 @@
             <option value="demo">Watch: CPU vs CPU</option>
           </select>
         </label>
-        <label>CPU strength
+        <label><span id="lblLevelTxt">CPU strength</span>
           <select id="selLevel"></select>
+        </label>
+        <label id="lblLevel2" style="display:none">
+          <span>CPU strength &mdash; Player 2 (bottom goal)</span>
+          <select id="selLevel2"></select>
         </label>
         <label>Pitch
           <select id="selBoard">
@@ -159,6 +163,13 @@
     under a second, which is why they played the same game; the rungs are now placed by what a doubling of the
     clock actually buys. If you had <b>Expert</b> saved from the previous version you now get a stronger level than
     before but a weaker one than the old Expert&nbsp;&mdash;&nbsp;that one is now called <b>Master</b>.</p>
+    <p><b>Watch: CPU vs CPU</b> may pair two different strengths. Choosing that opponent opens a second
+    strength row for Player 2; until you touch it both sides play at the strength of the first row, which is
+    what a Watch game always meant. The score boxes, the thinking line and the paper log name which side plays
+    at which level, and the depth printed next to a move is always the ceiling of the CPU that played it. Both
+    CPUs work from <b>one</b> transposition table, so a position one side has already proved can answer the
+    other side's turn outright &mdash;&nbsp;the line under the status says when that happens. From the address:
+    <code>#demo&amp;level=hard&amp;level2=master</code>.</p>
     <p>The status line under the pitch says what each CPU move really did: the depth proved, how many positions
     it looked at, and the thinking time. It is written while the CPU is still thinking, one search slice at a
     time, because the search runs on the page's own thread in slices of about 60&nbsp;ms so the paper keeps
@@ -189,10 +200,11 @@
       <li>Player 1 moved to the number-pad / <code>IOPKL,./</code> cluster, Player 2 to <code>QWE/ASD/ZXC</code>.</li>
       <li>No external files needed: the ball and the kick sound are drawn/synthesised. If the page is served over http, the original <code>kick (n).wav</code> files are used automatically.</li>
     </ul>
-    <p class="foot">Everything is in this one file. The rules and the AI live in the
-    <code>engine-src</code> block, which <code>tools/selftest.mjs</code> runs head-less in node
-    (<code>node tools/selftest.mjs</code>) to check legality, termination and what each CPU level really
-    reaches in play.</p>
+    <p class="foot">Four files: <code>index.html</code>, <code>game.css</code>, <code>engine.js</code> (the rules
+    and the search, no DOM in it) and <code>app.js</code> (the paper, the input, the match controller). Open
+    <code>index.html</code> straight from disk — no server needed. <code>tools/selftest.mjs</code> runs the engine
+    head-less in node to check legality, termination and what each CPU level really reaches in play, and
+    <code>tools/uismoke.mjs</code> drives this interface against a stub DOM.</p>
   </div>
 </div>
 

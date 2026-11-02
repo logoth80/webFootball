@@ -8,7 +8,9 @@
   /* ---------- config ---------- */
   var cfg = {
     cellCols: 8, cellRows: 12, goalHalf: 1,
-    mode: 'youP1', level: 'normal', sound: true, hints: true, theme: 'light'
+    /* level2 belongs to Watch mode (CPU vs CPU): null means "the same strength as Player 1's",
+       which is what it did before the two sides could be set apart. */
+    mode: 'youP1', level: 'normal', level2: null, sound: true, hints: true, theme: 'light'
   };
   (function loadPrefs() {
     try {
@@ -18,14 +20,20 @@
   })();
   /* a strength remembered by an older build may name a level that no longer exists */
   if (!(window.FBEngine && FBEngine.LEVELS[cfg.level])) cfg.level = 'normal';
+  if (cfg.level2 != null && !(window.FBEngine && FBEngine.LEVELS[cfg.level2])) cfg.level2 = null;
   /* index.html#demo starts a CPU vs CPU game you can watch; #level=master|expert|hard|normal|easy
-     picks the strength for this opening; #dark (or #theme=dark / #theme=light) picks the paper.
+     picks the strength for this opening and #level2=... the strength of the second CPU (naming one
+     level for a Watch game still means both sides, which is what it always meant);
+     #dark (or #theme=dark / #theme=light) picks the paper.
      None of them is written back to the saved settings. */
   try {
     var startHash = String((window.location && window.location.hash) || '').toLowerCase();
     if (startHash.indexOf('demo') >= 0) cfg.mode = 'demo';
     var lv = /level=(easy|normal|hard|expert|master)/.exec(startHash);
+    var lv2 = /level2=(easy|normal|hard|expert|master)/.exec(startHash);
     if (lv) cfg.level = lv[1];
+    if (lv2) cfg.level2 = lv2[1];
+    else if (lv && cfg.mode === 'demo') cfg.level2 = lv[1];
     if (startHash.indexOf('dark') >= 0) cfg.theme = 'dark';
     var th = /theme=(light|dark|auto)/.exec(startHash);
     if (th) cfg.theme = th[1];
@@ -77,6 +85,14 @@
     return (cfg.mode === 'youP1') ? side === 0 : side === 1;
   }
   function nameOf(side) { return isHuman(side) ? (side === 0 ? 'Player 1' : 'Player 2') : 'CPU'; }
+  /* Which strength a side plays at. In every other mode there is one CPU and cfg.level is it;
+     in Watch mode the two CPUs are set apart, and an unset level2 means "same as Player 1's". */
+  function levelOf(side) {
+    return (cfg.mode === 'demo' && side === 1 && cfg.level2) ? cfg.level2 : cfg.level;
+  }
+  function levelLabel(level) { var l = ENG.LEVELS[level]; return l && l.label ? l.label : String(level); }
+  /* the strength written next to a CPU's name, and nowhere else: goal lines stay plain */
+  function cpuTag(side) { return cfg.mode === 'demo' ? ' · ' + levelLabel(levelOf(side)) : ''; }
   function colorOf(side) { return side === 0 ? T.p1 : T.p2; }
   /* The sheet is hand-drawn on a canvas, so its palette is spelled out here too (the CSS
      variables cover the panels around it). Light is pencil on graph paper, graphite and blue; on dark paper, where graphite would be
@@ -420,7 +436,7 @@
     padSide = -1;
     $('log').textContent = '';
     layout();
-    logLine('— new game: ' + nameOf(0) + ' vs ' + nameOf(1) + ' —', '');
+    logLine('— new game: ' + nameOf(0) + cpuTag(0) + ' vs ' + nameOf(1) + cpuTag(1) + ' —', '');
     pump();
     refreshUi();
   }
@@ -486,16 +502,18 @@
      any proof it already holds, so a slice that follows a slice buys depth instead of repeating
      it, and a position that is already proved is answered from the table without any searching.
      The depth it has actually proved is written on the paper while it thinks. */
-  var thinkTimer = null, thinkSeq = 0, thinkMs = 0, thinkNodes = 0, SLICE_MS = 60;
+  var thinkTimer = null, thinkSeq = 0, thinkMs = 0, thinkNodes = 0, thinkSide = 0, SLICE_MS = 60;
   function stopThinking() { thinkSeq++; if (thinkTimer) { clearTimeout(thinkTimer); thinkTimer = null; } }
   /* One sentence about what the CPU really did. This used to print "proved depth 1 of 12" for a
      move that was answered without any new searching at all, because the position had already been
      searched during an earlier kick and the answer came out of the table. That is the most
      impressive thing the engine does and it looked like the least; so the sentence now says which
      of the three things actually happened. */
-  function aiInfo(mv) {
-    var lv = ENG.LEVELS[cfg.level] || ENG.LEVELS.normal;
-    var head = 'CPU ' + cfg.level + ': ';
+  function aiInfo(mv, side) {
+    var level = levelOf(side), lv = ENG.LEVELS[level] || ENG.LEVELS.normal;
+    /* named by its label, the same word the settings row shows: in Watch mode the two CPUs can
+       be different strengths, and the paper has to say which one this sentence is about */
+    var head = 'CPU ' + levelLabel(level) + ': ';
     var cost = ', ' + thinkNodes.toLocaleString() + ' positions, ' + (thinkMs / 1000).toFixed(1) + ' s';
     if (mv.fromTable) {
       return head + 'no new search: this position was already searched to ' + mv.tableDepth +
@@ -511,7 +529,8 @@
       (thinkNodes ? cost : ', and the table answered every branch of it — not one new position was searched');
   }
   function askCpu(side) {
-    var lv = ENG.LEVELS[cfg.level] || ENG.LEVELS.normal;
+    var level = levelOf(side), lv = ENG.LEVELS[level] || ENG.LEVELS.normal;
+    thinkSide = side;
     var total = Math.max(150, lv.budget), t0 = Date.now(), best = null, mine = ++thinkSeq;
     thinkMs = 0; thinkNodes = 0;
     function finish() {
@@ -522,13 +541,13 @@
     function step() {
       if (mine !== thinkSeq || phase !== 'think') return;
       var left = total - (Date.now() - t0);
-      var mv = cpu.choose(cfg.level, match.ps, left > SLICE_MS ? SLICE_MS : Math.max(60, left));
+      var mv = cpu.choose(level, match.ps, left > SLICE_MS ? SLICE_MS : Math.max(60, left));
       if (mv) {
         best = mv;
         /* what this slice cost, added up: the depth shown is what the position is now proven
            to, part of which may have been proved during an earlier kick */
         thinkMs += mv.ms || 0; thinkNodes += mv.nodes || 0;
-        lastAiInfo = 'CPU ' + cfg.level + ': ' +
+        lastAiInfo = 'CPU ' + levelLabel(level) + ': ' +
           (mv.partial || mv.depth < 1 ? 'still on its first ply' : 'searched to ' + mv.depth + ' of ' + lv.depth + ' plies') +
           ', ' + thinkNodes.toLocaleString() + ' positions, ' + (thinkMs / 1000).toFixed(1) + ' s so far';
         $('substatus').innerHTML = subLine();
@@ -546,7 +565,7 @@
       logLine('no stroke left — ' + nameOf(match.winner) + ' wins', match.winner === 0 ? 'g1' : 'g2');
       phase = 'over'; refreshUi(); return;
     }
-    lastAiInfo = aiInfo(mv);
+    lastAiInfo = aiInfo(mv, thinkSide);
     doKick(mv);
   }
 
@@ -583,8 +602,8 @@
   function refreshUi() {
     $('sc1').textContent = match.scores[0];
     $('sc2').textContent = match.scores[1];
-    $('box1').firstChild.textContent = nameOf(0) + (cfg.mode !== '2p' && cfg.mode !== 'demo' && isHuman(0) ? ' (you)' : '');
-    $('box2').firstChild.textContent = nameOf(1) + (cfg.mode !== '2p' && cfg.mode !== 'demo' && isHuman(1) ? ' (you)' : '');
+    $('box1').firstChild.textContent = nameOf(0) + cpuTag(0) + (cfg.mode !== '2p' && cfg.mode !== 'demo' && isHuman(0) ? ' (you)' : '');
+    $('box2').firstChild.textContent = nameOf(1) + cpuTag(1) + (cfg.mode !== '2p' && cfg.mode !== 'demo' && isHuman(1) ? ' (you)' : '');
     $('box1').classList.toggle('active', !match.over && match.ps.side === 0);
     $('box2').classList.toggle('active', !match.over && match.ps.side === 1);
 
@@ -592,7 +611,7 @@
     var side = match.ps.side, col = side === 0 ? 'p1' : 'p2';
     buildPad(side);
     pw.className = 'padwrap ' + col + (phase === 'wait' && isHuman(side) ? '' : ' idle');
-    $('padTitle').textContent = nameOf(side) + "'s keys" + (isHuman(side) && phase === 'wait' ? ' — click to kick' : '');
+    $('padTitle').textContent = nameOf(side) + cpuTag(side) + "'s keys" + (isHuman(side) && phase === 'wait' ? ' — click to kick' : '');
     Array.prototype.forEach.call($('pad').children, function (el) {
       if (el.dataset.dir == null) return;
       el.classList.toggle('dead', !(phase === 'wait' && isHuman(side)));
@@ -601,7 +620,7 @@
     if (match.over) {
       st.innerHTML = '<b>' + nameOf(match.winner) + ' won</b><br>' + explainEnd();
     } else if (phase === 'think') {
-      st.innerHTML = nameOf(side) + ' is thinking<span class="again">…</span>';
+      st.innerHTML = nameOf(side) + cpuTag(side) + ' is thinking<span class="again">…</span>';
     } else {
       var msg = nameOf(side) + ' to kick';
       if (phase === 'wait' && isHuman(side) && midBounceChain()) msg += ' <span class="again">— bounce, kick again!</span>';
@@ -710,7 +729,8 @@
   function doHint() {
     if (phase !== 'wait') return;
     var side = match.ps.side; if (!isHuman(side)) return;
-    var mv = cpu.choose(cfg.level === 'easy' ? 'hard' : cfg.level, ENG.cloneState(board, match.ps), 900);
+    var hintLevel = levelOf(match.ps.side);
+    var mv = cpu.choose(hintLevel === 'easy' ? 'hard' : hintLevel, ENG.cloneState(board, match.ps), 900);
     if (!mv) { invalid(); return; }
     hint = { from: mv.from, to: mv.to, until: lastTs + 2500 };
     logLine('hint: ' + dirName(mv.dir) + (mv.isBounce ? ' (bounce)' : ''), side === 0 ? 'g1' : 'g2');
@@ -757,14 +777,24 @@
 
   /* ---------- settings wiring ---------- */
   function fillLevels() {
-    var sel = $('selLevel');
-    Object.keys(ENG.LEVELS).forEach(function (k) {
-      var o = document.createElement('option'); o.value = k; o.textContent = ENG.LEVELS[k].label; sel.appendChild(o);
+    [$('selLevel'), $('selLevel2')].forEach(function (sel) {
+      Object.keys(ENG.LEVELS).forEach(function (k) {
+        var o = document.createElement('option'); o.value = k; o.textContent = ENG.LEVELS[k].label; sel.appendChild(o);
+      });
     });
+  }
+  /* The second strength row belongs to Watch mode alone: in every other mode there is only one CPU,
+     and a second row would ask a question with no second machine to answer it. */
+  function syncLevelRows() {
+    var watch = cfg.mode === 'demo';
+    $('lblLevel2').style.display = watch ? '' : 'none';
+    $('lblLevelTxt').textContent = watch ? 'CPU strength — Player 1 (top goal)' : 'CPU strength';
   }
   function readSettings() {
     cfg.mode = $('selMode').value;
     cfg.level = $('selLevel').value;
+    cfg.level2 = ENG.LEVELS[$('selLevel2').value] ? $('selLevel2').value : null;
+    syncLevelRows();
     var bc = BOARD_PRESETS[$('selBoard').value] || [8, 12];
     var nCols = bc[0], nRows = bc[1];
     var restart = cfg.cellCols !== nCols || cfg.cellRows !== nRows;
@@ -781,6 +811,8 @@
   function applyCfgToUi() {
     $('selMode').value = cfg.mode;
     $('selLevel').value = cfg.level;
+    $('selLevel2').value = levelOf(1);
+    syncLevelRows();
     $('selBoard').value = cfg.cellCols + ',' + cfg.cellRows;
     if (!$('selBoard').value) $('selBoard').value = '8,12';
     $('chkHints').checked = !!cfg.hints;

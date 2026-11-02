@@ -19,10 +19,11 @@ Double-click [`index.html`](index.html), or drag it into a browser. To also get 
 python -m http.server 8000     # then open http://127.0.0.1:8000/index.html
 ```
 
-Three URL hashes change how the page opens, without touching your saved settings: `index.html#demo` starts a
+Four URL hashes change how the page opens, without touching your saved settings: `index.html#demo` starts a
 CPU vs CPU game you can watch, `index.html#level=hard` (or `easy`, `normal`, `expert`, `master`) picks the
-strength for that opening, and `index.html#dark` opens it on dark paper. Combine them:
-`index.html#demo#level=master`.
+strength for that opening, `#level2=master` gives the second CPU of a Watch game its own strength (naming one
+level for a Watch game still means both sides), and `index.html#dark` opens it on dark paper. Combine them:
+`index.html#demo#level=hard#level2=master`.
 
 The whole window is one sheet of graph paper — the page background grid is re-scaled to the pitch grid,
 and the pitch is drawn centred on the sheet, as it would be on a real exercise page. Player 1 plays with a
@@ -67,7 +68,12 @@ exists as a button, an on-screen 3×3 key pad, or a click/tap on the hollow dot 
 
 * **Opponent** — solo as Player 1 or Player 2, two players on one keyboard, or CPU vs CPU to watch.
 * **CPU strength** — `easy`, `normal`, `hard`, `expert`, `master`, named plainly in the menu; the depths and
-  thinking times behind them are in [The CPU](#the-cpu). Normal is the default.
+  thinking times behind them are in [The CPU](#the-cpu). Normal is the default. Choosing "CPU vs CPU" opens a
+  second strength row, so a watched game can be `hard` against `master`: the score boxes, the thinking line and
+  the paper log say which side plays at which level, and the depth printed next to a move is always that CPU's
+  own ceiling. Until the second row is touched both sides play at the first row's strength, as before. Both
+  CPUs work from one transposition table, so a position one of them proved can answer the other's turn with no
+  searching at all — the line under the status says when that happens.
 * **Pitch** — small 6 × 10, classic 8 × 12 (the original board, with the area outside its border taken out
   of play), big 10 × 16.
 * **Show legal dots** — the faint rings next to the ball; turn them off for a real pen-and-paper feel.
@@ -288,7 +294,7 @@ is no test-only copy of the engine that could drift from the one being played.
 ```
 node tools/selftest.mjs           # 97 checks: html/css/js wiring, pitch geometry and its boundary, rules, undo, self-play, the ladder, strength matches
 node tools/selftest.mjs --fast    # 90 of them — skips only the strength matches, seconds instead of ~20 minutes
-node tools/uismoke.mjs            # 17 checks: boots the interface on a stub DOM, drives the key pad, the hotkeys and the CPU's thinking slices
+node tools/uismoke.mjs            # 23 checks: boots the interface on a stub DOM, drives the key pad, the hotkeys, the CPU's thinking slices, and a two-strength Watch pairing
 node tools/ladder.mjs             # proved depth against thinking time, position by position — the source of the ladder table
 node tools/bench.mjs normal hard  # what reusing the table across moves saves, move by move
 node tools/threads.mjs 2          # the root split across four engine instances against one core; the argument is how many games
