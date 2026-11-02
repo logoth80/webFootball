@@ -21,6 +21,10 @@ Double-click [`index.html`](index.html), or drag it into a browser. To also get 
 python -m http.server 8000     # then open http://127.0.0.1:8000/index.html
 ```
 
+Or play it already served: **<https://logoth80.github.io/webFootball/>** — the same files, from a `gh-pages`
+branch that is a copy of `main`, so over https the original kick samples load and nothing has to be installed or
+opened locally. The hash links above work there too: `https://logoth80.github.io/webFootball/#demo#level=hard#level2=master`.
+
 Four URL hashes change how the page opens, without touching your saved settings: `index.html#demo` starts a
 CPU vs CPU game you can watch, `index.html#level=hard` (or `easy`, `normal`, `expert`, `master`) picks the
 strength for that opening, `#level2=master` gives the second CPU of a Watch game its own strength (naming one
@@ -351,6 +355,7 @@ on an idle machine if you want the numbers above.
 | [`tools/shot.mjs`](tools/shot.mjs), [`tools/pageeval.mjs`](tools/pageeval.mjs) | drive a headless Chrome over CDP: the first takes the screenshots above, the second reads the page's own text back — which is where the numbers quoted under them come from |
 | [`preview.png`](preview.png), [`preview-demo.png`](preview-demo.png), [`preview-dark.png`](preview-dark.png) | screenshots of the page (light, CPU vs CPU, dark), so the look is reviewable without opening the game |
 | [UNLICENSE](UNLICENSE) | the dedication: the code and the writing here are public domain — do what you like, no permission asked, no warranty given |
+| `.nojekyll` | empty, and only for GitHub Pages: without it Pages builds the site with Jekyll instead of handing out these files |
 
 The repository is the game, the rule spec it was written against, the tools that measured every number in this
 file, the screenshots above, and [UNLICENSE](UNLICENSE). Nothing else is needed to play it, and nothing else has
@@ -359,6 +364,16 @@ because the ball is drawn) and the local leftovers of the measuring runs — hea
 stdout, probe frames, logs — are all deleted. [RULES.md](RULES.md) is what the original program left behind, and
 the game does not read it. Nothing here was measured against a test-only copy of the engine: the browser and the
 tools load the same `engine.js`.
+
+The public URL is served from a branch named `gh-pages`, which is not a second copy of the project to keep up to
+date: it is `main` pushed under that name, and one command is all an update ever needs —
+
+```
+git push origin main:gh-pages
+```
+
+The empty `.nojekyll` in the tree is what makes that possible. Without it, Pages takes the branch through Jekyll
+before serving it, and a build step between these files and the browser is the one thing this game has never had.
 
 ## Things it does not do
 
