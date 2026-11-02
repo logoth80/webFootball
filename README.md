@@ -32,7 +32,7 @@ thinking time after every move):
 
 ![CPU against CPU](preview-demo.png)
 
-The same sheet drawn in white and pale-blue pencil, opened with `#dark` or chosen under Settings → Paper:
+The same sheet drawn with a green and a pale-blue pencil, opened with `#dark` or chosen under Settings → Paper:
 
 ![The same pitch on dark paper](preview-dark.png)
 
@@ -40,10 +40,10 @@ The same sheet drawn in white and pale-blue pencil, opened with `#dark` or chose
 
 | | up-left / up / up-right | left / right | down-left / down / down-right |
 |---|---|---|---|
-| **Player 1** (black ink, attacks the **top** goal) | `I` `O` `P` | `K` `L` (or `;`) | `,` `.` `/` |
+| **Player 1** (attacks the **top** goal) | `I` `O` `P` | `K` `L` (or `;`) | `,` `.` `/` |
 | **Player 1**, number pad | `Num 7` `Num 8` `Num 9` | `Num 4` `Num 6` | `Num 1` `Num 2` `Num 3` |
 | **Player 1**, straight only | `↑` | `←` `→` | `↓` |
-| **Player 2** (blue ink, attacks the **bottom** goal) | `Q` `W` `E` | `A` `D` | `Z` `X` `C` |
+| **Player 2** (attacks the **bottom** goal) | `Q` `W` `E` | `A` `D` | `Z` `X` `C` |
 
 The two clusters are the mirror of each other — left hand for Player 2, right hand (or the number pad) for
 Player 1, so a laptop without a number pad still gets a full 8-direction pad. Binding is by physical key,
@@ -58,16 +58,18 @@ the hollow dot you want to kick to.
 
 * **Opponent** — solo as Player 1 or Player 2, two players on one keyboard, or CPU vs CPU to watch.
 * **CPU strength** — `easy`, `normal`, `hard`, `expert` (see [The CPU](#the-cpu)).
-* **Pitch** — small 6 × 10, classic 8 × 12 (exactly the original board), big 10 × 16.
-* **Match** — next goal wins, first to 3 or 5, or play until the paper is full.
-* **Own goals** — allowed (they win for the other side, as in a real paper game) or forbidden kicks.
+* **Pitch** — small 6 × 10, classic 8 × 12 (the original board, less its goal-area hatch), big 10 × 16.
 * **Show legal dots** — the faint rings next to the ball; turn them off for a real pen-and-paper feel.
-* **Paper** — light graph paper (the default, and the look of the original), dark paper, or follow the
-  system's light/dark setting. The canvas, the panels and the page grid all switch together, and the switch
-  is instant: the sheet is re-drawn, not re-loaded.
+* **Paper** — light graph paper (the default, and the look of the original: Player 1 in a black pen, Player 2
+  in a blue one), dark paper (Player 1 in a green pencil, Player 2 in pale blue, because black would be
+  invisible there), or follow the system's light/dark setting. The canvas, the panels and the page grid all
+  switch together, and the switch is instant: the sheet is re-drawn, not re-loaded.
 
-Settings and the pitch you chose are remembered in `localStorage`; the printed pitch and the rules are
-identical to the original at kick-off, verified by the tests below.
+Settings and the pitch you chose are remembered in `localStorage`. Two things are deliberately **not**
+settings: the next goal wins, and an own goal always scores for the other side — both are how the game is
+actually played, so they are rules here, not options (see [Deliberate changes](#deliberate-changes)). The
+printed pitch is asserted by the tests below: on the classic board 44 of the 404 lattice segments are
+printed, which leaves 360 playable.
 
 ## The CPU
 
@@ -122,33 +124,38 @@ few goals between two strong AIs, and expect to lose the paper if you only attac
 
 Compared with `football.pyw`, these are choices, not accidents (the numbering follows §8 of [RULES.md](RULES.md)):
 
-1. **The goal-area hatch is visible.** The original drew it and then painted the goal area back to white,
-   so players could not see why a kick was illegal or why a bounce happened. It is printed faintly now.
+1. **The goal-area hatch of the original is neither drawn nor playable.** The original printed 36 faint
+   diagonal and end-row segments beside the posts and then painted most of them back to white, so nobody
+   could see why a kick was blocked or where a bounce came from. Here the printed pitch is the touchlines,
+   the half-way line, the goal-area lines and the two short post lines: the thick border is enough to play
+   by, and it leaves 360 free lines instead of 324.
 2. **No silent pass.** A CPU with a legal stroke always plays one; being stuck loses for the stuck side,
    for the CPU exactly as for a human. The original returned "no move" and simply gave the turn back.
-3. **Own goals are a rule**, shown on screen, with an on/off switch (the original allowed them by accident).
-4. **A goal is a match event**: score up, the conceding side kicks off from the centre, the strokes already
-   on the paper stay there. Match length is a setting; a full pitch ends the match, and there is no draw
-   rule — the side that cannot kick loses.
+3. **Own goals always score for the other side.** No switch and no "illegal kick" variant — the original
+   allowed them by accident, and they are part of the game.
+4. **The next goal wins.** No match-length setting and no kick-off: the match ends the moment the ball rests
+   in a goal mouth, and that goal line stays exactly where it was drawn. A pitch with no legal stroke left
+   ends the same way — the side that cannot kick loses. There is no draw rule.
 5. **The pitch size is a setting** instead of depending on your screen size, so "the classic 8 × 12" is a
-   reproducible board (404 segments, 80 printed, 324 playable — asserted by the tests).
+   reproducible board (404 segments, 44 printed, 360 playable — asserted by the tests).
 6. **Player 1 moved to the number pad / `IOPKL,./` cluster**, Player 2 to `QWE/ASD/ZXC`; the original used
    `QWE/ASD/ZXC` for Player 1.
 7. **No external assets needed**: the ball sprite and the kick sound are generated. `ball.png` and the
    `.wav` files are only used when they can be fetched (http serving).
 8. The AI delay bug (`1500 - waited*10000`) is gone; thinking happens in a worker and never blocks drawing.
-9. **Player 1 draws in black, not green.** The original used green for Player 1 and blue for Player 2. The
-   real game is played with one black and one blue ballpoint, black reads better on graph paper, and it is
-   the colour that survives printing and a dark sheet. Player 2 is still blue.
+9. **On light paper Player 1 draws in black, not green.** The original used green for Player 1 and blue for
+   Player 2. The real game is played with one black and one blue ballpoint, and black reads better on graph
+   paper. Where black would be invisible — the dark sheet — Player 1 goes back to the original green.
 10. **The players' strokes are lighter than the printed pitch** — a pencil line drawn over pre-printed graph
     paper is thinner than the print, and keeping the print heavier makes it obvious which lines are not yours.
 11. **The net is drawn inside the goal frame** — between the two short post lines, the way you would actually
     sketch it on paper — instead of hanging outside the pitch.
-12. **Dark paper exists** (Settings → Paper, or `#dark`): the identical pitch, rules and geometry in white and
-    pale-blue pencil on dark paper. Light remains the default.
+12. **Dark paper exists** (Settings → Paper, or `#dark`): the same pitch, rules and geometry drawn with a
+    green and a pale-blue pencil. Light remains the default.
 
-Unchanged on purpose: the pitch geometry, the 8-direction single-segment kick, the shared once-only
-strokes, the bounce/pass rule, the goal mouth of three dots, and the general ballpoint-on-graph-paper look.
+Unchanged on purpose: the rest of the pitch geometry, the 8-direction single-segment kick, the shared
+once-only strokes, the bounce/pass rule, the goal mouth of three dots, and the general ballpoint-on-graph-paper
+look.
 
 ## Testing it
 
@@ -163,10 +170,12 @@ node tools/uismoke.mjs            # 12 checks: boots the interface on a stub DOM
 node tools/trace.mjs hard 800     # prints what the CPU is thinking in a hand-made position
 ```
 
-`selftest.mjs` asserts the pitch matches the original exactly (segment counts, printed lines, goal mouth,
-posts, hatch), that landing on a bare dot passes the turn while a lined dot is a bounce, that a dead-end
-bounce loses, own-goal handling both ways, kick-off semantics, bit-for-bit undo, that every move the CPU
-produces is legal, that it never passes, and that games end by the rules. The strength ladder is a
+`selftest.mjs` asserts the pitch as it is played here — 404 lattice segments, exactly 44 printed ones
+(20 touchlines, 8 half-way, 12 goal-area lines, 4 posts), 360 playable, a three-dot goal mouth with its front
+open — that landing on a bare dot passes the turn while a lined dot is a bounce, that a dead-end bounce
+loses, that an own goal is offered, scores for the other side and loses the match for whoever kicked it in,
+that the first goal ends the match with no kick-off, bit-for-bit undo, that every move the CPU produces is
+legal, that it never passes, and that games end by the rules. The strength ladder is a
 measurement, not a proof: each pairing prints the depth both sides reached, and if the machine was too busy
 for the stronger side to search deeper than the weaker one, the pairing is reported as inconclusive instead of
 failed. Run it on an idle machine if you want the number.

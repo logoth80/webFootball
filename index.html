@@ -20,11 +20,11 @@
     --hand:Georgia,'Times New Roman',serif; --body:Arial,Helvetica,sans-serif; --mono:'Courier New',monospace;
     color-scheme:light;
   }
-  /* dark mode: the same game drawn on dark paper with a white and a pale-blue pencil.
-     Set on <html> by the theme select in Settings (or by the OS preference on first run). */
+  /* dark mode: the same game drawn on dark paper with a green and a pale-blue pencil.
+     Set on <html> by the Paper select in Settings (which also offers "follow the system"). */
   :root[data-theme="dark"]{
     --paper:#15171d; --paper-field:#171a20; --grid:rgba(130,158,196,.34); --grid-soft:rgba(130,158,196,.16);
-    --ink:#e9edf6; --ink-soft:rgba(214,224,242,.55); --p1:#f4f6fa; --p2:#7fb0ff; --warn:#ff8080;
+    --ink:#e9edf6; --ink-soft:rgba(214,224,242,.55); --p1:#4ed28c; --p2:#7fb0ff; --warn:#ff8080;
     --panel:#1f232c; --card:#262b36; --line:rgba(214,224,242,.22); --shadow:0 2px 0 rgba(0,0,0,.45);
     --header-bg:rgba(21,23,29,.60); --modal-bg:rgba(21,23,29,.95); --active:rgba(214,224,242,.45);
     color-scheme:dark;
@@ -153,8 +153,8 @@
       <form class="set" id="settings" autocomplete="off">
         <label>Opponent
           <select id="selMode">
-            <option value="youP1">Solo — you are Player 1 (black ink, top goal)</option>
-            <option value="youP2">Solo — you are Player 2 (blue ink, bottom goal)</option>
+            <option value="youP1">Solo — you are Player 1 (top goal)</option>
+            <option value="youP2">Solo — you are Player 2 (bottom goal)</option>
             <option value="2p">Two players on one keyboard</option>
             <option value="demo">Watch: CPU vs CPU</option>
           </select>
@@ -162,32 +162,13 @@
         <label>CPU strength
           <select id="selLevel"></select>
         </label>
-        <div class="row2">
-          <label>Pitch
-            <select id="selBoard">
-              <option value="6,10">Small 6 × 10</option>
-              <option value="8,12">Classic 8 × 12 (as the original)</option>
-              <option value="10,16">Big 10 × 16</option>
-            </select>
-          </label>
-          <label>Match
-            <select id="selMatch">
-              <option value="1">Next goal wins</option>
-              <option value="3">First to 3 goals</option>
-              <option value="5">First to 5 goals</option>
-              <option value="0">Play until the paper is full</option>
-            </select>
-          </label>
-        </div>
-        <div class="row2">
-          <label>Own goals
-            <select id="selOwn">
-              <option value="allow">allowed (they win for the other side)</option>
-              <option value="forbid">forbidden kicks</option>
-            </select>
-          </label>
-          <label>&nbsp;</label>
-        </div>
+        <label>Pitch
+          <select id="selBoard">
+            <option value="6,10">Small 6 × 10</option>
+            <option value="8,12">Classic 8 × 12 (as the original)</option>
+            <option value="10,16">Big 10 × 16</option>
+          </select>
+        </label>
         <label>Paper
           <select id="selTheme">
             <option value="light">light graph paper</option>
@@ -213,7 +194,7 @@
           <li>The ball sits on the grid crossings. A kick draws one straight pen stroke to any of the 8 neighbouring crossings.</li>
           <li>A stroke may be drawn <b>only once</b>, by anybody. Crossing other strokes is fine — re-drawing one is not.</li>
           <li>Land on a crossing that <b>already has a stroke</b> at it &rarr; <span style="color:var(--warn)">bounce!</span> you kick again. Land on a bare crossing &rarr; the other player takes over.</li>
-          <li>Goal = land the ball on one of the 3 goal-mouth dots of the goal you attack. The pitch is hatched near each goal: those hatch lines are real (they block re-drawing and they create bounces).</li>
+          <li>Goal = land the ball on one of the 3 goal-mouth dots of the goal you attack. <b>Next goal wins.</b> The printed pitch lines are real lines too: they block re-drawing and they bounce the ball.</li>
           <li>No legal stroke left? You lose. Kicking into your own goal loses too.</li>
         </ul>
       </details>
@@ -225,9 +206,9 @@
   <div class="inner">
     <button class="close" id="bHelpClose">Close</button>
     <h2>Paper Football — rules &amp; keys</h2>
-    <p>The pen-and-paper game: a ball on a lattice of grid crossings, two pens. Full rules of the
-    original Python version are in <code>RULES.md</code>; this file implements the same rules with the
-    ambiguities resolved as noted below.</p>
+    <p>The pen-and-paper game: a ball on a lattice of grid crossings, two pens. <code>RULES.md</code> holds the
+    rules of the original Python version; this file plays the same game with the changes listed under
+    <i>What changed compared to <code>football.pyw</code></i> below.</p>
 
     <h3>Kicking</h3>
     <p>A kick is one straight stroke from the ball to any of the 8 neighbouring crossings (horizontal,
@@ -237,11 +218,11 @@
     you can keep hitting lined crossings. Landing on a bare crossing passes the turn.</p>
 
     <h3>Scoring</h3>
-    <p>Player 1 (black ink) attacks the <b>top</b> goal, Player 2 / CPU (blue ink) the <b>bottom</b> one: land the
-    ball on any of the three goal-mouth dots. A goal is followed by a kick-off from the centre for the
-    player who was scored against; the strokes already on the paper stay there. A player with no legal
-    stroke left loses the match, which is also how a full pitch ends. Kicking into your own goal wins for
-    the other side (or is an illegal kick, if you turn own goals off).</p>
+    <p>Player 1 attacks the <b>top</b> goal, Player 2 / CPU the <b>bottom</b> one: land the ball on any of
+    the three goal-mouth dots. <b>The next goal wins</b>, and it counts whichever way the ball goes in —
+    landing in the goal you do <i>not</i> attack scores for the other side, so an own goal loses the match
+    for whoever kicked it in. A player with no legal stroke left loses, which is also how a pitch that is
+    full to the last line ends.</p>
 
     <h3>Keys</h3>
     <p><b>Player 1</b> — the right-hand cluster: <code>I O P</code> / <code>K L</code> (or <code>;</code>) /
@@ -253,9 +234,11 @@
     <code>Esc</code> closes it. <code>/</code> and <code>?</code> belong to Player 1, so the panel is not on
     <code>?</code>. On a phone or tablet use the on-screen key pad, or simply tap the highlighted dot you
     want to kick to.</p>
-    <p><b>Paper:</b> Settings &rarr; Paper draws the whole thing again in dark — the same pitch in white and
-    pale-blue pencil on dark paper — or in light, which is the default; "follow the system" tracks your
-    system's light/dark setting from then on. <code>#dark</code> in the address starts it dark.</p>
+    <p><b>Paper and ink:</b> Settings &rarr; Paper. On light graph paper Player 1 plays with a <b>black</b> pen
+    and Player 2 with a <b>blue</b> one, which is what the real game is played with. On dark paper black
+    would be invisible, so there Player 1 is a <b>green</b> pencil and Player 2 stays pale blue. Light is the
+    default; "follow the system" tracks your system's light/dark setting from then on. <code>#dark</code> in
+    the address starts it dark.</p>
 
     <h3>CPU strength</h3>
     <p><b>Easy</b> kicks around without shooting into its own goal; it is the only level that changes its
@@ -272,9 +255,9 @@
 
     <h3>What changed compared to <code>football.pyw</code></h3>
     <ul>
-      <li>The goal-area hatch is <b>visible</b> now (it was drawn and then painted over in white, so players could not see why a kick was blocked or why a bounce happened).</li>
+      <li>The goal-area hatch of the original is <b>not drawn and not played</b>. The pitch is the border, the half-way line, the goal-area lines and the two short post lines; the original's 36 faint diagonal and end-row segments next to the posts were decoration that happened to be playable lines. The printed border is enough to play by, and it leaves 360 rather than 324 free lines on the classic pitch.</li>
       <li>The CPU searches with the opponent in the loop (the original scored only its own landing spot by distance to goal, and could walk into its own goal). It never passes when it has a legal kick; being stuck loses, as for a human.</li>
-      <li>Goals count as a match (first to N, alternating kick-offs, pitch keeps the strokes), own goals are an explicit rule with an on/off switch, and there is undo, hints, an event log and a rules panel.</li>
+      <li>The <b>next goal wins</b>, and an own goal always loses the match for whoever kicked it in — no match-length or own-goal switches, because both are how the game is actually played. There is undo, hints, an event log and a rules panel.</li>
       <li>Player 1 moved to the number-pad / <code>IOPKL,./</code> cluster, Player 2 to <code>QWE/ASD/ZXC</code>.</li>
       <li>No external files needed: the ball and the kick sound are drawn/synthesised. If the page is served over http, the original <code>kick (n).wav</code> files are used automatically.</li>
     </ul>
@@ -307,7 +290,6 @@
     var W = cw + 1, H = ch + 1, N = W * H;
     var gc = cw / 2, gr = ch / 2;
     var goalHalf = Math.max(1, Math.min(cfg.goalHalf == null ? 1 : cfg.goalHalf, gc - 1));
-    var ownGoals = cfg.ownGoals !== false;
     function idx(c, r) { return r * W + c; }
 
     var edgeNodes = [], edgeId = new Map();
@@ -336,7 +318,9 @@
       }
     }
 
-    /* printed pitch — identical to the original football.pyw layout */
+    /* printed pitch — the original football.pyw layout, minus the goal-area hatch:
+       the border, the half-way line, the goal-area lines and the two post lines are enough
+       to play by, and 36 faint diagonal segments near the posts bought nothing. */
     var pre = [], seen = new Set();
     function add(c1, r1, c2, r2) {
       var ee = addEdge(idx(c1, r1), idx(c2, r2));
@@ -352,11 +336,6 @@
     }
     var posts = [gc - goalHalf, gc + goalHalf];
     for (i = 0; i < 2; i++) { add(posts[i], 0, posts[i], 1); add(posts[i], H - 2, posts[i], H - 1); }
-    for (i = 0; i < 2; i++) {                                                                     /* goal-area hatch, in the end rows of cells */
-      var rr = i === 0 ? 0 : H - 2;
-      for (c = 0; c <= cw - 1; c++) { if (c >= gc - goalHalf && c < gc + goalHalf) continue; add(c, rr, c + 1, rr + 1); add(c + 1, rr, c, rr + 1); }
-      for (c = 0; c <= W - 1; c++) { if (c >= gc - goalHalf && c <= gc + goalHalf) continue; add(c, rr, c, rr + 1); }
-    }
 
     var goalNodes = [[], []], goalOwner = new Int8Array(N); for (e = 0; e < N; e++) goalOwner[e] = -1;
     for (c = gc - goalHalf; c <= gc + goalHalf; c++) {
@@ -376,7 +355,7 @@
 
     return {
       cellCols: cw, cellRows: ch, W: W, H: H, N: N, E: E, gc: gc, gr: gr, goalHalf: goalHalf,
-      ownGoals: ownGoals, idx: idx, center: idx(gc, gr), adjEdge: adjEdge, adjTo: adjTo,
+      idx: idx, center: idx(gc, gr), adjEdge: adjEdge, adjTo: adjTo,
       edgeNodes: edgeNodes, goalNodes: goalNodes, goalOwner: goalOwner, hdist: hdist,
       preUsed: preUsed, preCount: pre.length, playable: E - pre.length
     };
@@ -408,7 +387,6 @@
       var e = board.adjEdge[base + k];
       if (e < 0 || ps.used[e]) continue;
       var to = board.adjTo[base + k], own = board.goalOwner[to];
-      if (own !== -1 && own !== side && !board.ownGoals) continue;
       out.push({
         edge: e, from: a, to: to, dir: k, isBounce: ps.deg[to] > 0,
         isGoal: own === side, isOwnGoal: own !== -1 && own !== side
@@ -612,18 +590,18 @@
 
   var sessions = new Map();
   function session(cfg) {
-    var key = [cfg.cellCols, cfg.cellRows, cfg.goalHalf | 0, cfg.ownGoals ? 1 : 0].join('|');
+    var key = [cfg.cellCols, cfg.cellRows, cfg.goalHalf | 0].join('|');
     var s = sessions.get(key);
     if (!s) { var board = buildBoard(cfg); s = { board: board, cpu: createCpu(board) }; sessions.set(key, s); }
     return s;
   }
 
-  /* ---------------- match: goals, kick-offs, undo ---------------- */
+  /* ---------------- match: the next goal decides it, own goals included; undo ---------------- */
   function createMatch(cfg) {
     var s = session(cfg);
     var M = {
       cfg: cfg, board: s.board, cpu: s.cpu, ps: null, scores: [0, 0],
-      firstTo: cfg.firstTo | 0, over: false, winner: null, reason: '', hist: [],
+      over: false, winner: null, reason: '', hist: [],
 
       reset: function () {
         this.ps = newState(this.board, 0); this.scores = [0, 0];
@@ -644,26 +622,18 @@
 
         var rec = {
           kind: 'move', mv: found, side: ps.side, scores: this.scores.slice(),
-          over: this.over, winner: this.winner, reason: this.reason, kickoff: null
+          over: this.over, winner: this.winner, reason: this.reason
         };
         var evt = { kind: 'kick', side: rec.side, from: found.from, to: found.to, bounce: found.isBounce, goal: false, ownGoal: false, stuck: false };
         makeMove(ps, found);
 
         var owner = board.goalOwner[found.to];
         if (owner !== -1) {
+          /* the next goal settles the match, and it counts whichever way the ball goes in:
+             landing in the goal you do not attack scores for the other side */
           evt.goal = true; evt.scorer = owner; evt.ownGoal = (owner !== rec.side);
           this.scores[owner]++;
-          if (this.firstTo > 0 && this.scores[owner] >= this.firstTo) {
-            this.over = true; this.winner = owner; this.reason = evt.ownGoal ? 'own goal' : 'goals';
-          } else {
-            rec.kickoff = { ball: ps.ball, side: ps.side };
-            ps.ball = board.center; ps.side = owner ^ 1;
-            if (legalMoves(board, ps).length === 0) {
-              this.over = true; this.winner = (owner ^ 1) ^ 1; this.reason = 'no strokes left'; evt.stuck = true;
-            }
-            this.hist.push(rec);
-            return evt;
-          }
+          this.over = true; this.winner = owner; this.reason = evt.ownGoal ? 'own goal' : 'goals';
         }
         if (!this.over && legalMoves(board, ps).length === 0) {
           this.over = true; this.winner = ps.side ^ 1; this.reason = 'no strokes left'; evt.stuck = true;
@@ -675,7 +645,6 @@
       undo: function () {
         if (!this.hist.length) return false;
         var rec = this.hist.pop(), ps = this.ps;
-        if (rec.kickoff) { ps.ball = rec.kickoff.ball; ps.side = rec.kickoff.side; }
         unmakeMove(ps, rec.mv);
         ps.side = rec.side;
         this.scores = rec.scores; this.over = rec.over; this.winner = rec.winner; this.reason = rec.reason;
@@ -713,7 +682,7 @@
 
   /* ---------- config ---------- */
   var cfg = {
-    cellCols: 8, cellRows: 12, goalHalf: 1, ownGoals: true, firstTo: 3,
+    cellCols: 8, cellRows: 12, goalHalf: 1,
     mode: 'youP1', level: 'normal', sound: true, hints: true, theme: 'light'
   };
   (function loadPrefs() {
@@ -736,7 +705,7 @@
   } catch (e) {}
   function savePrefs() { try { localStorage.setItem('paperfootball.cfg', JSON.stringify(cfg)); } catch (e) {} }
   /* Paper: 'light' is the shipped look (blue-black ballpoint on graph paper), 'dark' is the same
-     game in white and pale-blue pencil on dark paper, 'auto' follows the system. The default is
+     game in a green and a pale-blue pencil on dark paper, 'auto' follows the system. The default is
      light on purpose — the paper-and-pen look is the point of this thing. */
   function systemDark() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
@@ -783,14 +752,14 @@
   function nameOf(side) { return isHuman(side) ? (side === 0 ? 'Player 1' : 'Player 2') : 'CPU'; }
   function colorOf(side) { return side === 0 ? T.p1 : T.p2; }
   /* The sheet is hand-drawn on a canvas, so its palette is spelled out here too (the CSS
-     variables cover the panels around it). Light is ballpoint on graph paper; dark is a white
-     and a pale-blue pencil on dark paper. applyTheme() swaps the palette and repaints. */
+     variables cover the panels around it). Light is ballpoint on graph paper, black and blue; on dark paper, where black would be
+     invisible, Player 1 is a green pencil (football.pyw's colour for that side) and Player 2 stays blue. applyTheme() swaps the palette and repaints. */
   var THEMES = {
     light: { field:'#eef0fa', grid:'rgba(160,200,230,.72)', dots:'rgba(30,0,130,.16)', fibre:'rgba(30,0,130,',
              ink:'#1e0082', p1:'#000000', p2:'#0000c8', warn:'#c01414',
              toast:'rgba(30,0,130,.75)', veil:'rgba(238,240,250,.72)', shadow:'rgba(30,0,130,0.14)' },
     dark:  { field:'#171a20', grid:'rgba(130,158,196,.34)', dots:'rgba(214,224,242,.20)', fibre:'rgba(255,255,255,',
-             ink:'#e9edf6', p1:'#f4f6fa', p2:'#7fb0ff', warn:'#ff8080',
+             ink:'#e9edf6', p1:'#4ed28c', p2:'#7fb0ff', warn:'#ff8080',
              toast:'rgba(226,233,246,.85)', veil:'rgba(21,23,29,.78)', shadow:'rgba(0,0,0,.45)' }
   };
   var T = THEMES.light;
@@ -931,18 +900,6 @@
   }
 
   /* ---------- the printed pitch (static layer) ---------- */
-  function edgeKind(e) {
-    var en = board.edgeNodes[e];
-    var a = en[0], b = en[1];
-    var c1 = a % board.W, r1 = (a / board.W) | 0, c2 = b % board.W, r2 = (b / board.W) | 0;
-    var inTop = r1 <= 1 && r2 <= 1, inBot = r1 >= board.H - 2 && r2 >= board.H - 2;
-    if (inTop || inBot) {
-      if (c1 === c2) return (c1 === board.gc - board.goalHalf || c1 === board.gc + board.goalHalf) ? 'main' : 'hatch';
-      if (r1 === r2) return 'main';
-      return 'hatch';
-    }
-    return 'main';
-  }
   function buildPaper() {
     var c = pctx, i, n;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -990,13 +947,13 @@
       c.fillText(side === 0 ? 'P1 attacks this goal' : 'P2 attacks this goal', (x1 + x2) / 2, labelY);
     }
 
-    /* printed pitch lines */
+    /* printed pitch lines — one weight, one darkness: this is the printed border of the
+       pitch, and it is meant to read as heavier than anything the players draw */
     for (i = 0; i < board.E; i++) {
       if (!board.preUsed[i]) continue;
       var en = board.edgeNodes[i];
       var x11 = nx(en[0]), y11 = ny(en[0]), x22 = nx(en[1]), y22 = ny(en[1]);
-      if (edgeKind(i) === 'hatch') pen(c, x11, y11, x22, y22, i * 1.7 + 0.3, T.ink, Math.max(0.8, cell * 0.022), 0.42);
-      else pen(c, x11, y11, x22, y22, i * 1.7 + 0.3, T.ink, Math.max(1.6, cell * 0.055), 0.92);
+      pen(c, x11, y11, x22, y22, i * 1.7 + 0.3, T.ink, Math.max(1.6, cell * 0.055), 0.92);
     }
   }
 
@@ -1120,7 +1077,7 @@
   function explainEnd() {
     if (match.reason === 'no strokes left') return 'no stroke left to draw';
     if (match.reason === 'own goal') return 'won by an own goal';
-    return match.scores[0] + ' – ' + match.scores[1] + ' on goals';
+    return 'the winning stroke ended in the ' + (match.winner === 0 ? 'top' : 'bottom') + ' goal';
   }
 
   /* ---------- match controller ---------- */
@@ -1130,10 +1087,7 @@
     anim = null; flash = null; hint = null; toast = null; hoverNode = -1;
     padSide = -1;
     $('log').textContent = '';
-    $('target').textContent = (cfg.firstTo === 1 ? 'next goal wins'
-        : cfg.firstTo ? 'first to ' + cfg.firstTo + ' goals wins'
-        : 'play until the paper is full') +
-      ' · own goals ' + (cfg.ownGoals ? 'count' : 'forbidden');
+    $('target').textContent = 'next goal wins · own goals count for the other side';
     layout();
     logLine('— new game: ' + nameOf(0) + ' vs ' + nameOf(1) + ' —', '');
     pump();
@@ -1208,7 +1162,7 @@
     var budget = ENG.LEVELS[cfg.level].budget;
     ensureWorker();
     if (worker) {
-      worker.postMessage({ cfg: { cellCols: cfg.cellCols, cellRows: cfg.cellRows, goalHalf: cfg.goalHalf, ownGoals: cfg.ownGoals }, used: match.ps.used, ball: match.ps.ball, side: side, level: cfg.level, budget: budget });
+      worker.postMessage({ cfg: { cellCols: cfg.cellCols, cellRows: cfg.cellRows, goalHalf: cfg.goalHalf }, used: match.ps.used, ball: match.ps.ball, side: side, level: cfg.level, budget: budget });
       workerTimer = setTimeout(function () {
         if (phase !== 'think') return;
         var ms = match.moves();
@@ -1302,7 +1256,7 @@
     var h = match.hist;
     if (!h.length) return false;
     var r = h[h.length - 1];
-    if (r.kind !== 'move' || r.kickoff) return false;
+    if (r.kind !== 'move') return false;
     return r.mv.isBounce && !match.over && match.ps.ball === r.mv.to;
   }
   function strokesDrawn() {
@@ -1447,10 +1401,8 @@
     cfg.level = $('selLevel').value;
     var bc = BOARD_PRESETS[$('selBoard').value] || [8, 12];
     var nCols = bc[0], nRows = bc[1];
-    var nOwn = $('selOwn').value === 'allow';
-    var nFirst = parseInt($('selMatch').value, 10) || 0;
-    var restart = cfg.cellCols !== nCols || cfg.cellRows !== nRows || cfg.ownGoals !== nOwn || cfg.firstTo !== nFirst;
-    cfg.cellCols = nCols; cfg.cellRows = nRows; cfg.ownGoals = nOwn; cfg.firstTo = nFirst;
+    var restart = cfg.cellCols !== nCols || cfg.cellRows !== nRows;
+    cfg.cellCols = nCols; cfg.cellRows = nRows;
     cfg.hints = $('chkHints').checked;
     var wantTheme = ['light', 'dark', 'auto'].indexOf($('selTheme').value) >= 0 ? $('selTheme').value : 'light';
     if (wantTheme !== cfg.theme) { cfg.theme = wantTheme; savePrefs(); applyTheme(); return; }
@@ -1465,10 +1417,6 @@
     $('selLevel').value = cfg.level;
     $('selBoard').value = cfg.cellCols + ',' + cfg.cellRows;
     if (!$('selBoard').value) $('selBoard').value = '8,12';
-    $('selMatch').value = String(cfg.firstTo);
-    if (['0', '1', '3', '5'].indexOf(String(cfg.firstTo)) < 0) cfg.firstTo = 3;
-    $('selMatch').value = String(cfg.firstTo);
-    $('selOwn').value = cfg.ownGoals ? 'allow' : 'forbid';
     $('chkHints').checked = !!cfg.hints;
     $('selTheme').value = themeChoice();
   }
