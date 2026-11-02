@@ -1,6 +1,7 @@
 # Paper Football — open `index.html`
 
-A rewrite of [`football.pyw`](football.pyw) in plain HTML + JavaScript: the same pen-on-graph-paper game, the
+A rewrite of `football.pyw` — the original pygame version of this game — in plain HTML + JavaScript: the same
+pen-on-graph-paper game, the
 same pitch, complete rules, and a CPU that actually plays the game instead of wandering toward a goal. Rules of
 the original were reverse-engineered first and are written up in [RULES.md](RULES.md); this implements them with
 the ambiguities resolved (see [Deliberate changes](#deliberate-changes)).
@@ -9,7 +10,8 @@ The game is four files and nothing else: [`index.html`](index.html) is the marku
 paper, [`engine.js`](engine.js) the rules and the search, [`app.js`](app.js) the drawing and the controller.
 No CDN, no build step, no image or sound file required — the ball is drawn as an ink sketch on the canvas and
 the kick is synthesised with WebAudio. Open `index.html` straight from disk; it does not need a server. If you
-do serve the folder over http, the original `kick (1..3).wav` files are picked up automatically.
+do serve the folder over http, the three `kick (1..3).wav` samples from the original — kept in this
+repository beside the game — are used instead of the synthesised one.
 
 ## Open it
 
@@ -32,16 +34,18 @@ the first one kept light enough that the strokes still read as drawn on paper ra
 
 ![The opening pitch on the sheet](preview.png)
 
-A demo game in progress, opened with `#demo` — the CPU playing both sides, one pen each. The two lines under the
-status say what it is really doing: the first is the search that decided the last kick (proved to 16 plies,
-101 352 positions, 0.1 s), the second is the search running right now, written while it works — 15 of 16 plies
-so far. The red "bounce — kick again!" is the only thing still in red, because it describes the state of the ball
-rather than who is winning:
+A demo game in progress, opened with `#demo#level=expert#level2=hard` — each CPU plays at its own strength, and
+the score boxes, the key-pad title and the paper log all name the side it belongs to. The two lines under the
+score are the stroke counter and what the last kick cost that CPU: proved to 16 plies, 10,964 positions, 0.0 s —
+the tree under this position had already been proved during earlier kicks, so the search picked up where that
+proof ended instead of starting over. The red "bounce — kick again!" is the only thing still in red, because it
+describes the state of the ball rather than who is winning:
 
 ![CPU against CPU](preview-demo.png)
 
-The same finished demo on dark paper, where graphite would be invisible so the two pens are a deep green and a
-deep blue — opened with `#dark` or chosen under Settings → Paper:
+The same pairing played out to its end on dark paper — 110 strokes and one goal, so both games are visible on the
+sheet at once. There graphite would be invisible, so the two pens are a deep green and a deep blue. Opened with
+`#dark`, or chosen under Settings → Paper:
 
 ![The same pitch on dark paper](preview-dark.png)
 
@@ -337,20 +341,23 @@ on an idle machine if you want the numbers above.
 | [`engine.js`](engine.js) | the rules and the search, DOM-free — the browser and the test tools load the same file |
 | [`app.js`](app.js) | canvas drawing, input, undo, hints, log, settings, sounds, and the sliced CPU turn |
 | [`RULES.md`](RULES.md) | the rules reverse-engineered from the original, plus the open questions |
-| [`football.pyw`](football.pyw) | the original pygame version, left untouched |
+| [`kick (1).wav`](<kick (1).wav>), [`kick (2).wav`](<kick (2).wav>), [`kick (3).wav`](<kick (3).wav>) | the original game's kick samples — used when the folder is served over http; the page synthesises its own kick without them |
 | [`tools/selftest.mjs`](tools/selftest.mjs) | rules, geometry, interface wiring, self-play and strength checks |
 | [`tools/uismoke.mjs`](tools/uismoke.mjs) | interface boot and click-through test with a stub DOM |
 | [`tools/ladder.mjs`](tools/ladder.mjs) | what a clock proves: proved depth against thinking time, position by position |
 | [`tools/bench.mjs`](tools/bench.mjs) | the same position twice, and a chain of real positions: what reusing the table saves |
 | [`tools/threads.mjs`](tools/threads.mjs) | the root split across private engine instances, played against one core |
 | [`tools/trace.mjs`](tools/trace.mjs) | ad-hoc: dump the CPU's move scores in one position |
+| [`tools/shot.mjs`](tools/shot.mjs), [`tools/pageeval.mjs`](tools/pageeval.mjs) | drive a headless Chrome over CDP: the first takes the screenshots above, the second reads the page's own text back — which is where the numbers quoted under them come from |
 | [`preview.png`](preview.png), [`preview-demo.png`](preview-demo.png), [`preview-dark.png`](preview-dark.png) | screenshots of the page (light, CPU vs CPU, dark), so the look is reviewable without opening the game |
 
-The published repository is only what the game needs: `index.html`, `game.css`, `engine.js`, `app.js`, this
-file and `.gitignore`. The links to `RULES.md`, `football.pyw`, `tools/…` and the screenshots therefore point at
-files that are not on GitHub — they live in the working copy beside the game, and they are where every number in
-this file was measured. Nothing here was measured against a test-only copy of the engine: the browser and the
-tools load the same `engine.js`.
+The repository is the game, the rule spec it was written against, the tools that measured every number in this
+file, and the screenshots above. What stays on the machine where it was made is the noise around that: the
+headless-Chrome profiles, captured stdout and probe frames of the measuring runs, and `ball.png` / `ball.ico` —
+the original's ball sprite, which this page never loads because the ball is drawn. The original `football.pyw`
+itself has been deleted from this folder: [RULES.md](RULES.md) is what it left behind, and the game does not read
+it. Nothing here was measured against a test-only copy of the engine: the browser and the tools load the same
+`engine.js`.
 
 ## Things it does not do
 
