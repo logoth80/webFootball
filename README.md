@@ -274,7 +274,12 @@ Compared with `football.pyw`, these are choices, not accidents (the numbering fo
     paper is thinner than the print, and keeping the print heavier makes it obvious which lines are not yours.
      Measured against the field: the printed ink 13.4:1, Player 1's graphite 12.0:1, Player 2's blue 5.0:1. The
      pitch stays the darkest thing on the sheet, and the blue is deliberately the lightest line in the game —
-     it is the one pen that shares its hue with the print.
+     it is the one pen that shares its hue with the print. A stroke is painted in three passes, and the
+     grain down its middle is the one place the pen is allowed to go **darker** than the print — that is
+     where a real pencil bites hardest. On light paper that grain is painted at α .40 in `rgb(13,14,17)`
+     over the stroke's own line pass, which composites to about `#2c2e36`; the same-hue grain of the
+     previous build sat near `#3a3c47`. A coloured pen keeps a plain, same-hue core: its hue is what says
+     who drew that line, and a black grain inside a blue stroke would only make the blue pen read dark.
 11. **The net is drawn inside the goal frame** — between the two short post lines, the way you would actually
     sketch it on paper — instead of hanging outside the pitch.
 12. **Dark paper exists** (Settings → Paper, or `#dark`): the same pitch, rules and geometry drawn with a

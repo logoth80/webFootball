@@ -212,10 +212,21 @@
   /* The players' pencil strokes are deliberately lighter than the printed pitch: a real
      pencil line over pre-printed graph paper is thinner than the print, not heavier. */
   function strokeW() { return Math.max(1.0, cell * 0.034); }
+  /* The grain down the middle of a stroke is deliberately darker than the stroke itself: a pencil
+     goes darkest where the lead bites. Only the graphite pen gets a blacker grain — that dark core is
+     what makes its line look drawn onto the sheet rather than printed onto it. A coloured pen keeps a
+     plain core, because its hue is what says who drew it, and a black grain inside a blue line would
+     only make that pen read as dark again. */
+  function coreOf(color) {
+    if (color !== THEMES.light.p1) return [color, 0.30];
+    var d = function (i) { return Math.round(parseInt(color.substr(i, 2), 16) * 0.3); };
+    return ['rgb(' + d(1) + ',' + d(3) + ',' + d(5) + ')', 0.40];
+  }
   function ink(c, x1, y1, x2, y2, seed, color, w, tEnd) {
+    var core = coreOf(color);
     pen(c, x1, y1, x2, y2, seed, color, w * 1.8, 0.07, tEnd);
     pen(c, x1, y1, x2, y2, seed, color, w, 0.88, tEnd);
-    pen(c, x1, y1, x2, y2, seed + 3.7, color, w * 0.5, 0.30, tEnd);
+    pen(c, x1, y1, x2, y2, seed + 3.7, core[0], w * 0.5, core[1], tEnd);
   }
   function drawBall(c, x, y, r, seed) {
     c.save(); c.translate(x, y);
