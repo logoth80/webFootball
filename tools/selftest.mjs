@@ -58,6 +58,30 @@ head('the page and its files');
   ok(fetches === 1 && !/fetch\(\s*['"](?:index|app|engine|game)\.[a-z]/.test(appCode),
      'the page fetches only its sound clips, never a file the game needs: opening index.html straight from disk has to work',
      'fetch call sites: ' + fetches);
+  /* the tab icon: inline, and the same ball the canvas draws (an href may contain raw < and >, so the
+     link tag is matched up to the quoted href rather than to its closing bracket) */
+  const iconLinks = [...html.matchAll(/<link[^>]*rel="icon"[^>]*?href="([^"]*)"/g)].map(m => m[1]);
+  const svg = iconLinks.length === 1
+    ? decodeURIComponent(iconLinks[0].replace(/^data:image\/svg\+xml,/, '')).replace(/'/g, '"') : '';
+  const svgNoNs = svg.replace(/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/, '');
+  ok(iconLinks.length === 1 && svg.startsWith('<svg') && svg.endsWith('</svg>') && svg !== svgNoNs &&
+     !/\burl\(|https?:|\.png|\.ico/.test(svgNoNs),
+     'the tab icon is one inline SVG in the markup and no file at all: a ball in the tab has to be there when index.html is opened straight from disk',
+     'icon links: ' + iconLinks.length + ', decoded head: ' + svg.slice(0, 30));
+  const ballFn = /function drawBall\(c, x, y, r, seed\) \{[\s\S]*?\n  \}/.exec(appSrc);
+  const gamePent = ballFn ? Number(/Math\.cos\(a\) \* r \* ([\d.]+)/.exec(ballFn[0])[1]) : -1;
+  const circ = /<circle[^>]*\bcx="([\d.]+)"[^>]*\bcy="([\d.]+)"[^>]*\br="([\d.]+)"/.exec(svg);
+  const poly = /<polygon points="([^"]*)"/.exec(svg);
+  const panels = circ && poly ? Math.max(...poly[1].trim().split(/\s+/).map(pt => {
+    const [x, y] = pt.split(',').map(Number); return Math.hypot(x - Number(circ[1]), y - Number(circ[2]));
+  })) : 0;
+  const spokePaths = (/<path[^>]*\bd="([^"]*)"/.exec(svg) || ['', ''])[1];
+  const spokeCount = (spokePaths.match(/M/g) || []).length;
+  const ratio = circ ? panels / Number(circ[3]) : 0;
+  ok(!!circ && !!poly && Math.abs(ratio - gamePent) < 0.02 && spokeCount === 5,
+     'the tab icon is the ball from the pitch: the pentagon-to-ball ratio and the number of panel lines are the ones drawBall() uses',
+     'ball r ' + (circ ? circ[3] : '-') + ', pentagon ' + panels.toFixed(2) + ' -> ratio ' + ratio.toFixed(3) +
+     ' vs the game\'s ' + gamePent + ', panel lines ' + spokeCount);
 }
 
 /* ================= 1. pitch geometry: the printed border is the boundary ================= */

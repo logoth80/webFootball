@@ -270,8 +270,14 @@ Compared with `football.pyw`, these are choices, not accidents (the numbering fo
    reproducible board (404 segments, 44 drawn, 48 off the pitch, 312 playable — asserted by the tests).
 6. **Player 1 moved to the number pad / `IOPKL,./` cluster**, Player 2 to `QWE/ASD/ZXC`; the original used
    `QWE/ASD/ZXC` for Player 1.
-7. **No external assets needed**: the ball sprite and the kick sound are generated. `ball.png` and the
-   `.wav` files are only used when they can be fetched (http serving).
+7. **No external assets needed**: the ball is drawn on the canvas, the tab icon is that same ball written
+   out as an inline SVG inside `index.html`, and the kick is synthesised with WebAudio. The original
+   `ball.png` sprite is gone and nothing loads it; the tab icon takes over the job `ball.ico` did for the
+   original window (RULES.md §1 lists both files). It is built from the ball's own three colours and the
+   ball's own pentagon-to-radius ratio, and the test suite reads those numbers out of the drawing code and
+   compares them with the icon rather than trusting the icon to stay a ball. Only the three `.wav` samples
+   are ever fetched, and only when the folder happens to be served over http. If a browser declines to use a
+   data-URI icon, its tab shows the generic page icon and nothing else changes.
 8. The AI delay bug (`1500 - waited*10000`) is gone; the CPU's thinking is sliced and never blocks drawing.
 9. **On light paper Player 1 draws in graphite, not green.** The original used green for Player 1 and blue for
    Player 2. The real game is played with one black and one blue pen, and a dark pen reads better on graph
@@ -305,8 +311,8 @@ DOM-free: the page loads it with a `<script src>`, and the scripts below load th
 is no test-only copy of the engine that could drift from the one being played.
 
 ```
-node tools/selftest.mjs           # 97 checks: html/css/js wiring, pitch geometry and its boundary, rules, undo, self-play, the ladder, strength matches
-node tools/selftest.mjs --fast    # 90 of them — skips only the strength matches, seconds instead of ~20 minutes
+node tools/selftest.mjs           # 99 checks: html/css/js wiring and the tab icon, pitch geometry and its boundary, rules, undo, self-play, the ladder, strength matches
+node tools/selftest.mjs --fast    # 92 of them — skips only the strength matches, seconds instead of ~20 minutes
 node tools/uismoke.mjs            # 23 checks: boots the interface on a stub DOM, drives the key pad, the hotkeys, the CPU's thinking slices, and a two-strength Watch pairing
 node tools/ladder.mjs             # proved depth against thinking time, position by position — the source of the ladder table
 node tools/bench.mjs normal hard  # what reusing the table across moves saves, move by move

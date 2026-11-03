@@ -4,12 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Paper Football — pen &amp; paper football game</title>
+<!-- the tab icon is the ball the page draws on the pitch: the same geometry and the same three
+     colours, written out inline as an SVG so that no image file is loaded for it -->
+<link rel="icon" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'><circle%20cx='16'%20cy='16'%20r='13'%20fill='%23fdfdf5'%20stroke='%231b1b2a'%20stroke-width='1.76'/><polygon%20points='16,10.54%2021.19,14.31%2019.21,20.42%2012.79,20.42%2010.81,14.31'%20fill='%2324243a'/><path%20d='M16%2010.54L16%204.56M21.19%2014.31L26.88%2012.46M19.21%2020.42L22.72%2025.26M12.79%2020.42L9.28%2025.26M10.81%2014.31L5.12%2012.46'%20fill='none'%20stroke='rgba(36,36,58,.7)'%20stroke-width='1.05'%20stroke-linecap='round'/></svg>">
 <!--
   Paper Football — a self-contained HTML/JS rewrite of football.pyw (see RULES.md for the rules
   that were reverse-engineered from the original). Same pen-on-graph-paper look, complete rule
   engine, and a real game-tree AI with selectable strength.
-  Everything lives in this file: no CDN, no build step, no external assets (kick sounds are
-  synthesised, and the original kick (n).wav files are used automatically when served over http).
+  Four files, no build step, nothing fetched in order to play: the ball and the tab icon are drawn,
+  the kick sound is synthesised, and the original kick (n).wav samples are used automatically when the
+  folder happens to be served over http. README.md names the files; RULES.md is the rule spec this was
+  written against.
 -->
 <link rel="stylesheet" href="game.css">
 </head>
